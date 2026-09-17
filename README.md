@@ -1,9 +1,9 @@
-# prerelease-delist
+# PrereleaseDelist
 
 A CLI to delist pre-release versions of your NuGet package(s).
 
-[![NuGet latest version](https://img.shields.io/nuget/v/AlastairLundy.PreReleaseDelist.svg)][nuget]
-[![NuGet downloads](https://img.shields.io/nuget/dt/AlastairLundy.PreReleaseDelist.svg)][nuget]
+[![NuGet latest version](https://img.shields.io/nuget/v/PreReleaseDelist.svg)][nuget]
+[![NuGet downloads](https://img.shields.io/nuget/dt/PreReleaseDelist.svg)][nuget]
 [![GitHub license](https://img.shields.io/github/license/alastairlundy/prerelease-delist.svg)][license]
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/alastairlundy/prerelease-delist/badge)][scorecard]
 
