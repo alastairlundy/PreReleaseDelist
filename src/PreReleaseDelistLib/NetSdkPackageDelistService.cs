@@ -98,11 +98,10 @@ public class NetSdkPackageDelistService : IPackageDelistService
         IDictionary<NuGetVersion, bool> checkVersionsForDelist = await _packageVersionService.CheckPackageVersionsListedAsync(nugetApiUrl, nugetApiKey, packageId,
             true, versions, cancellationToken);
 
-        NuGetVersion[] alreadyDelistedVersions = checkVersionsForDelist.Where(kvp => !kvp.Value).Select(kvp => kvp.Key)
-            .ToArray();
+        NuGetVersion[] alreadyDelistedVersions =
+            [.. checkVersionsForDelist.Where(kvp => !kvp.Value).Select(kvp => kvp.Key)];
         
-        NuGetVersion[] versionsToDelist = versions.Exclude(alreadyDelistedVersions)
-            .ToArray();
+        NuGetVersion[] versionsToDelist = [.. versions.Exclude(alreadyDelistedVersions)];
         
         foreach (NuGetVersion version in alreadyDelistedVersions)
         {
@@ -115,15 +114,15 @@ public class NetSdkPackageDelistService : IPackageDelistService
             {
                 TargetFilePath = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet",
                 OutputRedirection = true,
-                ArgumentList = new string[]
-                {
+                ArgumentList =
+                [
                     "nuget", "delete",
                     packageId.ToLowerInvariant(),
                     version.ToNormalizedString(),
                     "--api-key", nugetApiKey,
                     "--source", nugetApiUrl,
                     "--non-interactive"
-                }
+                ]
             };
             
             BufferedProcessResult result = await _processInvoker.ExecuteBufferedAsync(configuration,
