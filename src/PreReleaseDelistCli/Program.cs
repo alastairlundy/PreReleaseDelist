@@ -16,45 +16,27 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#if UseNetSdkDelistBackend
 using CliInvoke.Extensions;
-#endif
-
 using Microsoft.Extensions.DependencyInjection;
-using PreReleaseDelistLib.Abstractions;
 
 Cli.Ext.ConfigureServices(services =>
 {
     services.AddHttpClient()
+        .AddSingleton<IPackageAvailabilityDetector, PackageAvailabilityDetector>()
         .AddSingleton<IPackageVersionService, PackageVersionService>()
-#if UseNetSdkDelistBackend
-        .AddCliInvoke(ServiceLifetime.Singleton)
-        .AddSingleton<IPackageDelistService, NetSdkPackageDelistService>();
-#else
-        .AddSingleton<IPackageDelistService, PackageDelistService>();
-#endif
-    
-    IConfigurationBuilder configurationBuilder;
+        .AddKeyedSingleton<IPackageDelistService, PackageDelistService>("http")
+        .AddKeyedSingleton<IPackageDelistService, NetSdkPackageDelistService>("sdk")
+        .AddCliInvoke(ServiceLifetime.Singleton);
 
-    // Fallback to avoid using AppSettings.Json if it is not present.
-    try
-    {
-        configurationBuilder = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json");
-    }
-    catch
-    {
-        configurationBuilder = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory());
-    }
-        
+    ConfigurationBuilder configurationBuilder = new();
+    foreach (string basePath in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+        configurationBuilder.AddJsonFile(Path.Combine(basePath, "appsettings.json"), optional: true);
     IConfiguration configuration = configurationBuilder.Build();
-        
+
     services.AddSingleton(configuration);
 });
 
-await Cli.RunAsync<DelistCommand>(args, new CliSettings
+return await Cli.RunAsync<DelistCommand>(args, new CliSettings
 {
     EnableDefaultExceptionHandler = true,
     EnableSuggestDirective = true,

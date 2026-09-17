@@ -26,17 +26,11 @@
 
     <ItemGroup>
       <PackageReference Include="CliInvoke" />
-      <PackageReference Include="CliInvoke.Extensions" />
       <PackageReference Include="DotMake.CommandLine"/>
       <PackageReference Include="Microsoft.Extensions.Configuration"/>
       <PackageReference Include="Microsoft.Extensions.Configuration.Json"/>
       <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
     </ItemGroup>
-
-    <PropertyGroup>
-        <!-- default true, CI can set to false for non tool deployment -->
-        <UseNetSdkDelistBackend Condition="'$(UseNetSdkDelistBackend)'==''">true</UseNetSdkDelistBackend>
-    </PropertyGroup>
     
     <ItemGroup>
       <ProjectReference Include="..\PreReleaseDelistLib\PreReleaseDelistLib.csproj" />
