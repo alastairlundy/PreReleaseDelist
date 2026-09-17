@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-using System.Net;
 using EnhancedLinq.Deferred;
 
 namespace PreReleaseDelistLib;
@@ -41,22 +40,24 @@ public class PackageDelistService : IPackageDelistService
     }
 
     /// <summary>
-    /// Asynchronously requests the delisting of all versions of a specified NuGet package from a package registry.
+    /// Requests the delisting of all prerelease versions of a NuGet package.
     /// </summary>
     /// <param name="nugetApiUrl">The URL of the NuGet API.</param>
     /// <param name="nugetApiKey">The API key for authenticating with the NuGet service.</param>
     /// <param name="packageId">The identifier of the NuGet package to delist versions for.</param>
+    /// <param name="includeZeroMajorVersions">When true, stable versions with Major == 0 are also delisted alongside prerelease versions.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
-    /// <returns>An array of tuples containing the NuGet version, a boolean indicating the success of the delisting operation, and a response message from the service.</returns>
+    /// <returns>An asynchronous sequence of tuples containing the NuGet version, a boolean indicating the success of the delisting operation, and a response message from the service.</returns>
     public async IAsyncEnumerable<(NuGetVersion version, bool delistSuccess, string responseMessage)>
         RequestPackageDelistingAsync(string nugetApiUrl, string nugetApiKey, string packageId,
-            [EnumeratorCancellation] CancellationToken cancellationToken)
+            bool includeZeroMajorVersions = false,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        NuGetVersion[] versionToDelist = await _packageVersionService.GetAllPackageVersionsAsync
-            (nugetApiUrl, nugetApiKey, packageId, cancellationToken);
+        NuGetVersion[] versionsToDelist = await _packageVersionService.GetPrereleasePackageVersionsAsync
+            (nugetApiUrl, nugetApiKey, packageId, includeZeroMajorVersions, cancellationToken);
         
         IAsyncEnumerable<(NuGetVersion version, bool delistSuccess, string responseMessage)> result = RequestPackageDelistingAsync(nugetApiUrl,
-            nugetApiKey, packageId, versionToDelist, cancellationToken);
+            nugetApiKey, packageId, versionsToDelist, cancellationToken);
 
         await foreach ((NuGetVersion version, bool delistSuccess, string responseMessage) in result)
         {
@@ -72,13 +73,14 @@ public class PackageDelistService : IPackageDelistService
     /// <param name="packageId">The identifier of the NuGet package to delist versions for.</param>
     /// <param name="versions">The versions of the package to delist.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
-    /// <returns>An array of tuples containing the NuGet version, a boolean indicating the success of the delisting operation, and a response message from the service.</returns>
+    /// <returns>An asynchronous sequence of tuples containing the NuGet version, a boolean indicating the success of the delisting operation, and a response message from the service.</returns>
     public async IAsyncEnumerable<(NuGetVersion version, bool delistSuccess, string responseMessage)>
         RequestPackageDelistingAsync(string nugetApiUrl,
             string nugetApiKey, string packageId,
             IList<NuGetVersion> versions, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(nugetApiUrl);
+        ArgumentException.ThrowIfNullOrEmpty(nugetApiKey);
         ArgumentException.ThrowIfNullOrEmpty(packageId);
         ArgumentNullException.ThrowIfNull(versions);
         
@@ -98,45 +100,62 @@ public class PackageDelistService : IPackageDelistService
         
         foreach (NuGetVersion alreadyDelistedVersion in alreadyDelistedVersions)
         {
-            yield return (alreadyDelistedVersion, false, 
+            yield return (alreadyDelistedVersion, true, 
                 Resources.Info_Package_AlreadyDelisted);
         }
 
         if (versionsToDelist.Length == 0)
             yield break;
         
+        SourceRepository repoInfo = Repository.Factory.GetCoreV3(nugetApiUrl);
+
+        using var sourceCacheContext = new SourceCacheContext();
+
+        ServiceIndexResourceV3? serviceIndex =
+            await repoInfo.GetResourceAsync<ServiceIndexResourceV3>(cancellationToken);
+
+        if (serviceIndex is null)
+            throw new InvalidOperationException($"Service index resource is not available for this source: {nugetApiUrl}");
+
+        Uri? publishUrl = serviceIndex.GetServiceEntryUri("PackagePublish/2.0.0");
+
+        if (publishUrl is null)
+            publishUrl = new Uri(nugetApiUrl);
+
         HttpClient client = _clientFactory.CreateClient();
         
         client.DefaultRequestHeaders.Add(NugetApiKeyHeaderName, [nugetApiKey]);
-        client.BaseAddress =  new Uri(nugetApiUrl);
+        client.BaseAddress = new Uri(publishUrl.AbsoluteUri.TrimEnd('/') + "/");
         client.Timeout = TimeSpan.FromMinutes(2);
-        
-        Task<(NuGetVersion version, HttpResponseMessage responseMessage)>[] delistResponses = new Task<(NuGetVersion version,
-            HttpResponseMessage responseMessage)>[versionsToDelist.Length];
 
-        int index = 0;
-        foreach(NuGetVersion version in versionsToDelist)
+        foreach (NuGetVersion version in versionsToDelist)
         {
-            delistResponses[index] = new Task<(NuGetVersion version, HttpResponseMessage responseMessage)>(() =>
-            { 
-                Task<HttpResponseMessage> response = client.DeleteAsync(
-                    $"{packageId}{version.ToNormalizedString()}", cancellationToken);
-                
-                response.Wait(cancellationToken);
-                
-                return (version, response.Result);
-            });
+            string relativeUrl = $"{packageId}/{version.ToNormalizedString()}";
 
-            delistResponses[index].Start();
-            
-            index++;
+            (NuGetVersion version, bool delistSuccess, string responseMessage) result = await DeletePackageVersionAsync(client, relativeUrl, version, cancellationToken);
+
+            yield return result;
         }
-        
-        await foreach (Task<(NuGetVersion version, HttpResponseMessage responseMessage)> response in Task.WhenEach(delistResponses)
-                           .WithCancellation(cancellationToken))
+    }
+
+    private static async Task<(NuGetVersion version, bool delistSuccess, string responseMessage)> DeletePackageVersionAsync(
+        HttpClient client, string relativeUrl, NuGetVersion version, CancellationToken cancellationToken)
+    {
+        try
         {
-            yield return (response.Result.version, response.Result.responseMessage.StatusCode == HttpStatusCode.Accepted,
-                response.Result.responseMessage.ReasonPhrase ?? string.Empty);
+            using HttpResponseMessage response = await client.DeleteAsync(relativeUrl, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return (version, true, "");
+            }
+
+            string failureMessage = $"{(int)response.StatusCode} {response.ReasonPhrase}".Trim();
+            return (version, false, failureMessage);
+        }
+        catch (HttpRequestException ex)
+        {
+            return (version, false, ex.Message);
         }
     }
 }

@@ -9,3 +9,5 @@ global using Microsoft.Extensions.Configuration;
 global using PreReleaseDelistCli;
 global using PreReleaseDelistCli.Localizations;
 global using PreReleaseDelistLib;
+global using PreReleaseDelistLib.Abstractions;
+global using PreReleaseDelistLib.Detectors;
