@@ -1,4 +1,4 @@
-# prerelease-delist
+# PrereleaseDelist
 
 A CLI to delist pre-release versions of your NuGet package(s).
 
