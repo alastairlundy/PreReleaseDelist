@@ -68,7 +68,7 @@ public class PackageVersionService : IPackageVersionService
             yield break;
         }
 
-        foreach (NuGetVersion version in allPackageVersions.Where(v => v.IsPrerelease || (includeZeroMajorVersions && v.Major == 0)))
+        foreach (NuGetVersion version in allPackageVersions.Where(v => IsTargetPrereleaseVersion(v, includeZeroMajorVersions)))
         {
             yield return version;
         }
@@ -108,7 +108,7 @@ public class PackageVersionService : IPackageVersionService
         if (allPackageVersions is null)
             return [];
         
-        return allPackageVersions.Where(v => v.IsPrerelease || (includeZeroMajorVersions && v.Major == 0))
+        return allPackageVersions.Where(v => IsTargetPrereleaseVersion(v, includeZeroMajorVersions))
             .ToArray();
     }
 
@@ -268,5 +268,10 @@ public class PackageVersionService : IPackageVersionService
             .ToList();
 
         return metadata;
+    }
+
+    internal static bool IsTargetPrereleaseVersion(NuGetVersion v, bool includeZeroMajorVersions)
+    {
+        return v.IsPrerelease || (includeZeroMajorVersions && v.Major == 0);
     }
 }

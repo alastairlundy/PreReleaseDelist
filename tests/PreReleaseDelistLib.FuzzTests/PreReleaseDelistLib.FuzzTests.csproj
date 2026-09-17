@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <LangVersion>14</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="TUnit" />
+        <PackageReference Include="TUnit.FsCheck" />
+        <PackageReference Include="FsCheck" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\PreReleaseDelistLib\PreReleaseDelistLib.csproj" />
+        <ProjectReference Include="..\..\src\PreReleaseDelistCli\PreReleaseDelistCli.csproj" />
+    </ItemGroup>
+
+</Project>

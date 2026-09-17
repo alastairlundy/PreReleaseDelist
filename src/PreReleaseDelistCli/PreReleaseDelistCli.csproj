@@ -26,6 +26,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <InternalsVisibleTo Include="PreReleaseDelistLib.FuzzTests" />
+    </ItemGroup>
+
+    <ItemGroup>
       <PackageReference Include="CliInvoke" />
       <PackageReference Include="DotMake.CommandLine"/>
       <PackageReference Include="Microsoft.Extensions.Configuration"/>

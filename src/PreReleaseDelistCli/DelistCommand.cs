@@ -187,7 +187,7 @@ public class DelistCommand
         return nonDelistedVersions.Count > 0 ? 1 : 0;
     }
     
-    private static IList<NuGetVersion> ParseVersions(string[] versions, bool throwOnError)
+    internal static IList<NuGetVersion> ParseVersions(string[] versions, bool throwOnError)
     {
         List<NuGetVersion> output = new(capacity: versions.Length);
 

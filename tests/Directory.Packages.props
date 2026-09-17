@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <!-- Enable central package management, https://learn.microsoft.com/en-us/nuget/consume-packages/Central-Package-Management -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="TUnit" Version="1.68.4" />
+    <PackageVersion Include="TUnit.FsCheck" Version="1.68.4" />
+    <PackageVersion Include="FsCheck" Version="3.4.0" />
+  </ItemGroup>
+</Project>
