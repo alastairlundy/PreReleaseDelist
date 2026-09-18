@@ -1,5 +1,5 @@
 ﻿/*
-    prerelease-delist - Delist pre-release library versions from a Nuget Server
+    prerelease-delist - Delist pre-release package versions from a Nuget Server
     Copyright (C) 2026 Alastair Lundy
 
     This program is free software: you can redistribute it and/or modify
@@ -21,7 +21,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
-
 using NuGet.Versioning;
 using PreReleaseDelistCli.Helpers;
 
@@ -44,7 +43,7 @@ public class DelistCommand
         Arity = CliArgumentArity.ExactlyOne)]
     public string PackageId { get; set; }
 
-    [CliOption(Name = "--delist-all-versions")]
+    [CliOption(Name = "--delist-all")]
     public bool DelistAllVersions { get; set; } = false;
 
     [CliOption(Name = "--use-strict-parsing")]
@@ -53,7 +52,7 @@ public class DelistCommand
     [CliArgument(Name = "versions")]
     public string[] Versions { get; set; }
     
-    [CliOption(Name = "--api-key", Required = true)]
+    [CliOption(Name = "--api-key", Required = false)]
     [DefaultValue(null)]
     public string? ApiKey { get; set; }
 
@@ -93,7 +92,9 @@ public class DelistCommand
             ? ServerUrl
             : (!string.IsNullOrWhiteSpace(_configuration["NuGetServerUrl"])
                 ? _configuration["NuGetServerUrl"]!
-                : "https://api.nuget.org/v3/index.json");
+                : (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("NUGET_SERVER_URL"))
+                    ? Environment.GetEnvironmentVariable("NUGET_SERVER_URL")!
+                    : "https://api.nuget.org/v3/index.json"));
 
         if (!DelistAllVersions)
         {
@@ -108,7 +109,11 @@ public class DelistCommand
 
         ArgumentException.ThrowIfNullOrEmpty(PackageId);
         
-        string? nugetApiKey = !string.IsNullOrEmpty(ApiKey) ? ApiKey : _configuration["NuGetApiKey"];
+        string? nugetApiKey = !string.IsNullOrEmpty(ApiKey)
+            ? ApiKey
+            : (!string.IsNullOrEmpty(_configuration["NuGetApiKey"])
+                ? _configuration["NuGetApiKey"]
+                : Environment.GetEnvironmentVariable("NUGET_API_KEY"));
 
         if (string.IsNullOrEmpty(nugetApiKey))
         {

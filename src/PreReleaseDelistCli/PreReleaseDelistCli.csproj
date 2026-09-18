@@ -33,7 +33,7 @@
       <PackageReference Include="CliInvoke" />
       <PackageReference Include="DotMake.CommandLine"/>
       <PackageReference Include="Microsoft.Extensions.Configuration"/>
-      <PackageReference Include="Microsoft.Extensions.Configuration.Json"/>
+      <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables"/>
       <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
     </ItemGroup>
     
@@ -54,12 +54,6 @@
         <AutoGen>True</AutoGen>
         <DependentUpon>Resources.resx</DependentUpon>
       </Compile>
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Update="appsettings.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
     </ItemGroup>
 
     <ItemGroup>

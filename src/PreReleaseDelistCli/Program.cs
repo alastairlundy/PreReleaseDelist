@@ -1,5 +1,5 @@
 ﻿/*
-    prerelease-delist - Delist pre-release library versions from a Nuget Server
+    prerelease-delist - Delist pre-release package versions from a Nuget Server
     Copyright (C) 2026 Alastair Lundy
 
     This program is free software: you can redistribute it and/or modify
@@ -29,8 +29,7 @@ Cli.Ext.ConfigureServices(services =>
         .AddCliInvoke(ServiceLifetime.Singleton);
 
     ConfigurationBuilder configurationBuilder = new();
-    foreach (string basePath in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
-        configurationBuilder.AddJsonFile(Path.Combine(basePath, "appsettings.json"), optional: true);
+    configurationBuilder.AddEnvironmentVariables(prefix: "PRERELEASEDELIST_");
     IConfiguration configuration = configurationBuilder.Build();
 
     services.AddSingleton(configuration);

@@ -15,7 +15,7 @@ A CLI to delist pre-release versions of your NuGet package(s).
 
 - Delist specific pre-release versions of a NuGet package.
 - Delist all pre-release versions of a NuGet package.
-- Configure NuGet API Key and Server URL via configuration files.
+- Configure NuGet API Key and Server URL via environment variables.
 
 ## Installation
 
@@ -42,19 +42,19 @@ dotnet build -c Release
 
 ### Arguments and Options
 
-| Name                    | Type            | Required                                     | Default                               | Description                                                                                                                                                              |
-|-------------------------|-----------------|----------------------------------------------|---------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `versions` (argument)   | string[]        | Yes (unless `--delist-all-versions` is used) | —                                     | One or more pre-release version strings to delist. Only version strings starting with a digit are considered; others are ignored.                                        |
-| `--package-id`          | string          | Yes                                          | —                                     | The ID of the package to delist, e.g. `MyPackage`.                                                                                                                       |
-| `--api-key`             | string          | Yes*                                         | —                                     | The NuGet API key to authenticate with. If omitted, the CLI falls back to the `NuGetApiKey` value from `appsettings.json`.                                               |
-| `--server-url`          | string          | No                                           | `https://api.nuget.org/v3/index.json` | The NuGet server's V3 service index URL. Useful for third-party NuGet servers. Falls back to the `NuGetServerUrl` value from `appsettings.json`.                         |
-| `--delist-all-versions` | boolean         | No                                           | `false`                               | Delist all pre-release versions of the package instead of the explicitly listed `versions`.                                                                              |
-| `--include-zero-major`  | boolean         | No                                           | `false`                               | With `--delist-all-versions`, also include stable `0.x` (Major == 0) versions.                                                                                           |
-| `--use-strict-parsing`  | boolean         | No                                           | `true`                                | When `true`, an invalid version string causes an error. When `false`, invalid version strings are silently skipped.                                                      |
-| `--backend`             | `http` \| `sdk` | No                                           | `http`                                | Which delisting backend to use: the V3 `http` API, or the .NET SDK's package deprecation/delist support (`sdk`).                                                         |
-| `--non-interactive`     | boolean         | No                                           | `false`                               | Print a machine-friendly `Version=<version> Status=<Success\|Failure> ...` line per version and exit with a non-zero code if any version failed to delist. Useful in CI. |
+| Name                    | Type            | Required                            | Default                               | Description                                                                                                                                                              |
+|-------------------------|-----------------|-------------------------------------|---------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `versions` (argument)   | string[]        | Yes (unless `--delist-all` is used) | —                                     | One or more pre-release version strings to delist. Only version strings starting with a digit are considered; others are ignored.                                        |
+| `--package-id`          | string          | Yes                                 | —                                     | The ID of the package to delist, e.g. `MyPackage`.                                                                                                                       |
+| `--api-key`             | string          | Yes*                                | —                                     | The NuGet API key to authenticate with. If omitted, the CLI falls back to the `PRERELEASEDELIST_NuGetApiKey` or `NUGET_API_KEY` environment variables.                     |
+| `--server-url`          | string          | No                                  | `https://api.nuget.org/v3/index.json` | The NuGet server's V3 service index URL. Useful for third-party NuGet servers. Falls back to the `PRERELEASEDELIST_NuGetServerUrl` or `NUGET_SERVER_URL` environment variables. |
+| `--delist-all-versions` | boolean         | No                                  | `false`                               | Delist all pre-release versions of the package instead of the explicitly listed `versions`.                                                                              |
+| `--include-zero-major`  | boolean         | No                                  | `false`                               | With `--delist-all-versions`, also include stable `0.x` (Major == 0) versions.                                                                                           |
+| `--use-strict-parsing`  | boolean         | No                                  | `true`                                | When `true`, an invalid version string causes an error. When `false`, invalid version strings are silently skipped.                                                      |
+| `--backend`             | `http` \| `sdk` | No                                  | `http`                                | Which delisting backend to use: the V3 `http` API, or the .NET SDK's package deprecation/delist support (`sdk`).                                                         |
+| `--non-interactive`     | boolean         | No                                  | `false`                               | Print a machine-friendly `Version=<version> Status=<Success\|Failure> ...` line per version and exit with a non-zero code if any version failed to delist. Useful in CI. |
 
-\* Required either on the command line or via `appsettings.json`.
+\* Required either on the command line or via environment variable (see Configuration below).
 
 ### Environment Variables
 
@@ -66,24 +66,26 @@ prerelease-delist --package-id "MyPackage" --api-key "myApiKey" [env:NuGetServer
 
 ### Configuration
 
-Options can also be satisfied from .NET configuration instead of the command line. Precedence is: explicit `--api-key`/`--server-url` command-line options first, then `appsettings.json` values, then built-in defaults.
+Options can also be satisfied from environment variables instead of the command line. Precedence is: explicit `--api-key`/`--server-url` command-line options first, then `PRERELEASEDELIST_`-prefixed environment variables, then generic `NUGET_*` environment variables, then built-in defaults.
 
-The recognised configuration keys are:
+| Option       | `PRERELEASEDELIST_` env var        | Generic env var    |
+|--------------|------------------------------------|--------------------|
+| `--api-key`  | `PRERELEASEDELIST_NuGetApiKey`      | `NUGET_API_KEY`    |
+| `--server-url` | `PRERELEASEDELIST_NuGetServerUrl` | `NUGET_SERVER_URL` |
 
-| Key              | Used by                 |
-|------------------|-------------------------|
-| `NuGetServerUrl` | `--server-url` fallback |
-
-For `appsettings.json` (searched in the current directory, then the tool's install directory):
-
-```json
-{
-  "NuGetApiKey": "myApiKey",
-  "NuGetServerUrl": "https://api.nuget.org/v3/index.json"
-}
+```bash
+# bash
+export NUGET_API_KEY="myApiKey"
+export NUGET_SERVER_URL="https://api.nuget.org/v3/index.json"
 ```
 
-The `--api-key` lookup order is therefore: `--api-key` option → `appsettings.json` → error (the CLI exits with a message if no key is found).
+```powershell
+# PowerShell
+$env:NUGET_API_KEY = "myApiKey"
+$env:NUGET_SERVER_URL = "https://api.nuget.org/v3/index.json"
+```
+
+The `--api-key` lookup order is therefore: `--api-key` option → `PRERELEASEDELIST_NuGetApiKey` → `NUGET_API_KEY` → error (the CLI exits with a message if no key is found). If neither server-URL variable is set, the CLI falls back to `https://api.nuget.org/v3/index.json`.
 
 ### Examples
 
