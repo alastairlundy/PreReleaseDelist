@@ -11,7 +11,7 @@ Initial release.
 ### Added
 - `prerelease-delist` .NET global tool for delisting pre-release versions of NuGet packages.
 - Delist explicitly listed pre-release versions via the `versions` argument.
-- `--delist-all` to delist all pre-release versions of a package, with `--include-zero-major` to also include stable `0.x` versions.
+- `--delist-all` to delist all pre-release versions of a package, with `--include-zero-major` to also include `0.x` versions.
 - `--api-key` / `--server-url` options with `PRERELEASEDELIST_`-prefixed and generic `NUGET_*` environment variable fallback, plus third-party NuGet server support.
 - `--backend` selection (`http` V3 API or .NET SDK-backed delisting).
 - `--non-interactive` machine-friendly output mode for CI usage.
