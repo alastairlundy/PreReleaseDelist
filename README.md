@@ -7,7 +7,7 @@ A CLI to delist pre-release versions of your NuGet package(s).
 [![GitHub license](https://img.shields.io/github/license/alastairlundy/prerelease-delist.svg)][license]
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/alastairlundy/prerelease-delist/badge)][scorecard]
 
-[nuget]: https://www.nuget.org/packages/AlastairLundy.PreReleaseDelist/
+[nuget]: https://www.nuget.org/packages/PreReleaseDelist/
 [license]: LICENSE
 [scorecard]: https://api.scorecard.dev/projects/github.com/alastairlundy/prerelease-delist
 

@@ -1,0 +1,39 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Pack and publish to NuGet.org (trusted publishing)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore "src/PreRelease DeList.slnx"
+
+      - name: Build (packs the tool package via GeneratePackageOnBuild)
+        run: dotnet build -c Release --no-restore "src/PreRelease DeList.slnx"
+
+      - name: Push to NuGet.org with trusted publishing (OIDC, no API key)
+        run: dotnet nuget push "src/PreReleaseDelistCli/bin/Release/*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate

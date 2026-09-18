@@ -39,9 +39,10 @@ public class DelistCommand
         _serviceProvider = serviceProvider;
     }
     
+    // Initialized by DotMake option/argument binding after construction.
     [CliOption(Name = "--package-id", Required = true,
         Arity = CliArgumentArity.ExactlyOne)]
-    public string PackageId { get; set; }
+    public string PackageId { get; set; } = null!;
 
     [CliOption(Name = "--delist-all")]
     public bool DelistAllVersions { get; set; } = false;
@@ -50,7 +51,7 @@ public class DelistCommand
     public bool UseStrictParsing { get; set; } = true;
     
     [CliArgument(Name = "versions")]
-    public string[] Versions { get; set; }
+    public string[] Versions { get; set; } = null!;
     
     [CliOption(Name = "--api-key", Required = false)]
     [DefaultValue(null)]

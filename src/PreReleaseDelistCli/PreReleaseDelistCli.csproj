@@ -16,10 +16,11 @@
         <RepositoryUrl>https://github.com/alastairlundy/prerelease-delist</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageTags>delist, nuget,</PackageTags>
-        <PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+        <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
         <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
         <PackageId>PreReleaseDelist</PackageId>
         <Description>De-list NuGet package versions with ease from the Command Line.</Description>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageReleaseNotes>Initial Release</PackageReleaseNotes>
         <TargetFramework>net10.0</TargetFramework>
         <Version>0.1.0</Version>
@@ -60,6 +61,7 @@
       <Content Include="..\..\README.md">
         <Link>README.md</Link>
       </Content>
+      <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
 </Project>

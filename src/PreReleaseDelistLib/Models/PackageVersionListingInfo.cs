@@ -2,7 +2,7 @@
 
 public class PackageVersionListingInfo
 {
-    public NuGetVersion PackageVersion { get; set; }
+    public required NuGetVersion PackageVersion { get; set; }
     
     public bool IsListed { get; set; }
     
