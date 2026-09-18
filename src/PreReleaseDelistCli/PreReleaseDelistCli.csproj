@@ -5,6 +5,8 @@
         <ImplicitUsings>disable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <PackAsTool>true</PackAsTool>
+        <ToolCommandName>prerelease-delist</ToolCommandName>
+        <RollForward>Major</RollForward>
         <IsAoTCompatible>true</IsAoTCompatible>
         <IsTrimmable>true</IsTrimmable>
         <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
