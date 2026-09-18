@@ -8,6 +8,7 @@ Versions that are currently supported with Bug Fixes and/or Security Fixes.
 
 | Version series | Supported with Bug Fixes | Supported with Security Fixes |
 |--| --|--|
+| 0.x | 0.1 | 0.1 |
 
 ## Reporting a Security Vulnerability
 
