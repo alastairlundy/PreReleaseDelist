@@ -12,6 +12,12 @@
         <IsTrimmable>true</IsTrimmable>
         <IsAoTCompatible>true</IsAoTCompatible>
         <PolyArgumentExceptions>true</PolyArgumentExceptions>
+        <PackageId>PreReleaseDelist.Lib</PackageId>
+        <Title>PreReleaseDelist.Lib</Title>
+        <Authors>Alastair Lundy</Authors>
+        <Copyright>Copyright (c) 2026 Alastair Lundy</Copyright>
+        <RepositoryUrl>https://github.com/alastairlundy/PreReleaseDelist</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
     </PropertyGroup>
 
     <ItemGroup>

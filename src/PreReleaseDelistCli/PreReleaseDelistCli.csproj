@@ -15,17 +15,18 @@
         <Title>PreReleaseDelist</Title>
         <Authors>Alastair Lundy</Authors>
         <Copyright>Copyright (c) Alastair Lundy 2026</Copyright>
-        <RepositoryUrl>https://github.com/alastairlundy/prerelease-delist</RepositoryUrl>
+        <RepositoryUrl>https://github.com/alastairlundy/PreReleaseDelist</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageTags>delist, nuget,</PackageTags>
         <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
         <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
         <PackageId>PreReleaseDelist</PackageId>
-        <Description>De-list NuGet package versions with ease from the Command Line.</Description>
+        <Description>De-list NuGet package versions programatically with ease.</Description>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageReleaseNotes>Initial Release</PackageReleaseNotes>
         <TargetFramework>net10.0</TargetFramework>
         <Version>0.1.0</Version>
+        <PackageVersion>0.1.0</PackageVersion>
     </PropertyGroup>
 
     <ItemGroup>
