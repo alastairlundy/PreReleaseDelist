@@ -13,6 +13,7 @@ jobs:
   publish:
     name: Pack and publish to NuGet.org (trusted publishing)
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Harden the runner (Audit all outbound calls)
