@@ -5,7 +5,23 @@
 
 version: 2
 updates:
+  # Dependabot's NuGet updater only looks for entry points that sit *directly* in
+  # the configured directory; it does not recurse into subdirectories. The repo
+  # root has no solution or project file, so "directory: /" finds nothing and
+  # silently reports zero dependencies.
+  #
+  # "src" contains the solution that references every project in the repository,
+  # so it acts as a single entry point covering all of them:
+  #   src/PreRelease Delist.slnx
+  #     -> src/PreReleaseDelistLib/PreReleaseDelistLib.csproj
+  #     -> src/PreReleaseDelistCli/PreReleaseDelistCli.csproj
+  #     -> tests/PreReleaseDelistLib.FuzzTests/PreReleaseDelistLib.FuzzTests.csproj
+  #
+  # Versions are managed centrally, and Dependabot updates them in place. MSBuild
+  # resolves the nearest Directory.Packages.props by walking up from each project,
+  # so both src/Directory.Packages.props and tests/Directory.Packages.props are
+  # updated rather than versions being inlined into the project files.
   - package-ecosystem: "nuget" # See documentation for possible values
-    directory: "/" # Location of package manifests
+    directory: "/src" # Location of package manifests
     schedule:
       interval: "daily"
