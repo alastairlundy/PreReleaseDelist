@@ -133,7 +133,7 @@ public class PackageVersionService : IPackageVersionService
         if (!packageExists)
             throw new ArgumentException($"Package with Id of '{packageId}' does not exist.");
 
-        List<(NuGetVersion Version, bool IsListed)> metadata = await FetchPackageMetadataAsync(nugetApiUrl, nugetApiKey, packageId, cancellationToken);
+        List<(NuGetVersion Version, bool IsListed)> metadata = await FetchPackageMetadataAsync(nugetApiUrl, nugetApiKey, packageId, includePreReleaseVersions: true, cancellationToken);
 
         foreach ((NuGetVersion version, bool isListed) in metadata)
         {
@@ -166,7 +166,7 @@ public class PackageVersionService : IPackageVersionService
         if (!packageExists)
             throw new ArgumentException($"Package with Id of '{packageId}' does not exist.");
 
-        List<(NuGetVersion Version, bool IsListed)> metadata = await FetchPackageMetadataAsync(nugetApiUrl, nugetApiKey, packageId, cancellationToken);
+        List<(NuGetVersion Version, bool IsListed)> metadata = await FetchPackageMetadataAsync(nugetApiUrl, nugetApiKey, packageId, includePreReleaseVersions: true, cancellationToken);
 
         return metadata.Select(m => m.Version).ToArray();
     }
@@ -210,16 +210,21 @@ public class PackageVersionService : IPackageVersionService
     }
 
     /// <summary>
-    /// Checks whether each of the specified package versions is listed in the repository.
+    /// Reports the listing state of each of the specified package versions on the repository.
     /// </summary>
+    /// <remarks>
+    /// Every requested version is present in the result, including versions the repository does not know
+    /// about. Use <see cref="PackageVersionListingInfo.PackageVersionExists"/> to tell a version that is
+    /// absent from the repository apart from one that is present but unlisted.
+    /// </remarks>
     /// <param name="nugetApiUrl">The URL of the NuGet API.</param>
     /// <param name="nugetApiKey">The API key for authentication against the NuGet API.</param>
     /// <param name="packageId">The identifier of the package to check.</param>
     /// <param name="includePreReleaseVersions">Whether to include pre-release versions in the search results.</param>
     /// <param name="packageVersions">The specific versions of the package to verify against.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
-    /// <returns>A dictionary mapping each requested version to whether it is currently listed.</returns>
-    public async Task<IDictionary<NuGetVersion, bool>> CheckPackageVersionsListedAsync(string nugetApiUrl,
+    /// <returns>A dictionary mapping each requested version to its listing state.</returns>
+    public async Task<IDictionary<NuGetVersion, PackageVersionListingInfo>> CheckPackageVersionsListedAsync(string nugetApiUrl,
         string nugetApiKey, string packageId,
         bool includePreReleaseVersions,
         IList<NuGetVersion> packageVersions, CancellationToken cancellationToken)
@@ -227,18 +232,35 @@ public class PackageVersionService : IPackageVersionService
         ArgumentException.ThrowIfNullOrEmpty(packageId);
         ArgumentException.ThrowIfNullOrEmpty(nugetApiUrl);
         ArgumentException.ThrowIfNullOrEmpty(nugetApiKey);
+        ArgumentNullException.ThrowIfNull(packageVersions);
 
-        List<(NuGetVersion Version, bool IsListed)> metadata = await FetchPackageMetadataAsync(nugetApiUrl, nugetApiKey, packageId, cancellationToken);
+        List<(NuGetVersion Version, bool IsListed)> metadata =
+            await FetchPackageMetadataAsync(nugetApiUrl, nugetApiKey, packageId, includePreReleaseVersions, cancellationToken);
 
-        Dictionary<NuGetVersion, bool> metadataLookup = metadata.ToDictionary(m => m.Version, m => m.IsListed);
+        Dictionary<NuGetVersion, PackageVersionListingInfo> metadataLookup = metadata
+            .Select(m => new PackageVersionListingInfo
+            {
+                PackageVersion = m.Version,
+                IsListed = m.IsListed,
+                PackageVersionExists = true
+            })
+            .ToDictionary(m => m.PackageVersion);
 
-        NuGetVersion[] deduplicatedVersions = packageVersions.Distinct().ToArray();
+        Dictionary<NuGetVersion, PackageVersionListingInfo> output =
+            new Dictionary<NuGetVersion, PackageVersionListingInfo>(capacity: packageVersions.Count);
 
-        Dictionary<NuGetVersion, bool> output = new Dictionary<NuGetVersion, bool>(capacity: deduplicatedVersions.Length);
-
-        foreach (NuGetVersion version in deduplicatedVersions)
+        foreach (NuGetVersion version in packageVersions.Distinct())
         {
-            output[version] = metadataLookup.TryGetValue(version, out bool isListed) && isListed;
+            // A version missing from the repository metadata does not exist there. Recording that explicitly
+            // keeps it distinguishable from a version that exists but has already been unlisted.
+            output[version] = metadataLookup.TryGetValue(version, out PackageVersionListingInfo? listingInfo)
+                ? listingInfo
+                : new PackageVersionListingInfo
+                {
+                    PackageVersion = version,
+                    IsListed = false,
+                    PackageVersionExists = false
+                };
         }
 
         return output;
@@ -247,7 +269,7 @@ public class PackageVersionService : IPackageVersionService
     private SourceRepository GetRepoInfo(string nugetApiUrl) => Repository.Factory.GetCoreV3(nugetApiUrl);
 
     private async Task<List<(NuGetVersion Version, bool IsListed)>> FetchPackageMetadataAsync(string nugetApiUrl,
-        string nugetApiKey, string packageId, CancellationToken cancellationToken)
+        string nugetApiKey, string packageId, bool includePreReleaseVersions, CancellationToken cancellationToken)
     {
         SourceRepository repoInfo = GetRepoInfo(nugetApiUrl);
 
@@ -260,7 +282,7 @@ public class PackageVersionService : IPackageVersionService
             throw new InvalidOperationException($"Package metadata resource is not available for this source: {nugetApiUrl}");
 
         IEnumerable<IPackageSearchMetadata> results =
-            await metadataResource.GetMetadataAsync(packageId, includePrerelease: true, includeUnlisted: true,
+            await metadataResource.GetMetadataAsync(packageId, includePrerelease: includePreReleaseVersions, includeUnlisted: true,
                 cacheContext, NullLogger.Instance, cancellationToken);
 
         List<(NuGetVersion Version, bool IsListed)> metadata = results

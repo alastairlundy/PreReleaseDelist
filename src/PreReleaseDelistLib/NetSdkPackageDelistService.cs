@@ -17,7 +17,7 @@
  */
 
 using CliInvoke.Core;
-using EnhancedLinq.Deferred;
+using PreReleaseDelistLib.Internal;
 
 namespace PreReleaseDelistLib;
 
@@ -95,20 +95,25 @@ public class NetSdkPackageDelistService : IPackageDelistService
         if(!doesPackageExists)
             throw new ArgumentException(string.Format(Resources.Exceptions_Package_NotFoundOnServer, packageId, nugetApiUrl), nameof(packageId));
         
-        IDictionary<NuGetVersion, bool> checkVersionsForDelist = await _packageVersionService.CheckPackageVersionsListedAsync(nugetApiUrl, nugetApiKey, packageId,
-            true, versions, cancellationToken);
+        IDictionary<NuGetVersion, PackageVersionListingInfo> listingInfo =
+            await _packageVersionService.CheckPackageVersionsListedAsync(nugetApiUrl, nugetApiKey, packageId,
+                true, versions, cancellationToken);
 
-        NuGetVersion[] alreadyDelistedVersions =
-            [.. checkVersionsForDelist.Where(kvp => !kvp.Value).Select(kvp => kvp.Key)];
-        
-        NuGetVersion[] versionsToDelist = [.. versions.Exclude(alreadyDelistedVersions)];
-        
-        foreach (NuGetVersion version in alreadyDelistedVersions)
+        DelistPlan plan = DelistPlanning.Partition(versions, listingInfo);
+
+        foreach (NuGetVersion version in plan.AlreadyDelisted)
         {
             yield return new ValueTuple<NuGetVersion, bool, string>(version, true, Resources.Info_Package_AlreadyDelisted);
         }
-        
-        foreach (NuGetVersion version in versionsToDelist)
+
+        foreach (NuGetVersion version in plan.NotOnServer)
+        {
+            yield return new ValueTuple<NuGetVersion, bool, string>(version, false,
+                string.Format(Resources.Errors_Package_VersionNotFoundOnServer,
+                    version.ToNormalizedString(), packageId));
+        }
+
+        foreach (NuGetVersion version in plan.ToDelist)
         {
             ProcessConfiguration configuration = new()
             {

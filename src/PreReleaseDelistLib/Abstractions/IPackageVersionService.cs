@@ -88,16 +88,21 @@ public interface IPackageVersionService
         NuGetVersion packageVersion, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Checks whether each of the specified package versions is listed in the repository.
+    /// Reports the listing state of each of the specified package versions on the repository.
     /// </summary>
+    /// <remarks>
+    /// Every requested version is present in the result, including versions the repository does not know
+    /// about. Use <see cref="PackageVersionListingInfo.PackageVersionExists"/> to tell a version that is
+    /// absent from the repository apart from one that is present but unlisted.
+    /// </remarks>
     /// <param name="nugetApiUrl">The URL of the NuGet API.</param>
     /// <param name="nugetApiKey">The API key for authentication against the NuGet API.</param>
     /// <param name="packageId">The identifier of the package to check.</param>
     /// <param name="includePreReleaseVersions">Whether to include pre-release versions in the search results.</param>
     /// <param name="packageVersions">The specific versions of the package to verify against.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
-    /// <returns>A dictionary mapping each requested version to whether it is currently listed.</returns>
-    Task<IDictionary<NuGetVersion, bool>> CheckPackageVersionsListedAsync(string nugetApiUrl, string nugetApiKey,
-        string packageId, bool includePreReleaseVersions, IList<NuGetVersion> packageVersions,
+    /// <returns>A dictionary mapping each requested version to its listing state.</returns>
+    Task<IDictionary<NuGetVersion, PackageVersionListingInfo>> CheckPackageVersionsListedAsync(string nugetApiUrl,
+        string nugetApiKey, string packageId, bool includePreReleaseVersions, IList<NuGetVersion> packageVersions,
         CancellationToken cancellationToken);
 }

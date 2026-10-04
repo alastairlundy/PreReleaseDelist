@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-using EnhancedLinq.Deferred;
+using PreReleaseDelistLib.Internal;
 
 namespace PreReleaseDelistLib;
 
@@ -89,27 +89,29 @@ public class PackageDelistService : IPackageDelistService
         if(!doesPackageExist)
             throw new ArgumentException(string.Format(Resources.Exceptions_Package_NotFoundOnServer, packageId, nugetApiUrl), nameof(packageId));
         
-        IDictionary<NuGetVersion, bool> checkVersionsForDelist = await _packageVersionService.CheckPackageVersionsListedAsync(nugetApiUrl, nugetApiKey, packageId,
-            true, versions, cancellationToken);
+        IDictionary<NuGetVersion, PackageVersionListingInfo> listingInfo =
+            await _packageVersionService.CheckPackageVersionsListedAsync(nugetApiUrl, nugetApiKey, packageId,
+                true, versions, cancellationToken);
 
-        NuGetVersion[] alreadyDelistedVersions = checkVersionsForDelist.Where(kvp => !kvp.Value).Select(kvp => kvp.Key)
-            .ToArray();
-        
-        NuGetVersion[] versionsToDelist = versions.Exclude(alreadyDelistedVersions)
-            .ToArray();
-        
-        foreach (NuGetVersion alreadyDelistedVersion in alreadyDelistedVersions)
+        DelistPlan plan = DelistPlanning.Partition(versions, listingInfo);
+
+        foreach (NuGetVersion alreadyDelistedVersion in plan.AlreadyDelisted)
         {
-            yield return (alreadyDelistedVersion, true, 
+            yield return (alreadyDelistedVersion, true,
                 Resources.Info_Package_AlreadyDelisted);
         }
 
-        if (versionsToDelist.Length == 0)
-            yield break;
-        
-        SourceRepository repoInfo = Repository.Factory.GetCoreV3(nugetApiUrl);
+        foreach (NuGetVersion missingVersion in plan.NotOnServer)
+        {
+            yield return (missingVersion, false,
+                string.Format(Resources.Errors_Package_VersionNotFoundOnServer,
+                    missingVersion.ToNormalizedString(), packageId));
+        }
 
-        using var sourceCacheContext = new SourceCacheContext();
+        if (plan.ToDelist.Count == 0)
+            yield break;
+
+        SourceRepository repoInfo = Repository.Factory.GetCoreV3(nugetApiUrl);
 
         ServiceIndexResourceV3? serviceIndex =
             await repoInfo.GetResourceAsync<ServiceIndexResourceV3>(cancellationToken);
@@ -128,7 +130,7 @@ public class PackageDelistService : IPackageDelistService
         client.BaseAddress = new Uri(publishUrl.AbsoluteUri.TrimEnd('/') + "/");
         client.Timeout = TimeSpan.FromMinutes(2);
 
-        foreach (NuGetVersion version in versionsToDelist)
+        foreach (NuGetVersion version in plan.ToDelist)
         {
             string relativeUrl = $"{packageId}/{version.ToNormalizedString()}";
 

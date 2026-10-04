@@ -76,5 +76,14 @@ namespace PreReleaseDelistLib.Internal.Localizations {
                 return ResourceManager.GetString("Info.Package.AlreadyDelisted", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Version &quot;{0}&quot; was not found on Nuget Server for package &quot;{1}&quot;..
+        /// </summary>
+        internal static string Errors_Package_VersionNotFoundOnServer {
+            get {
+                return ResourceManager.GetString("Errors.Package.VersionNotFoundOnServer", resourceCulture);
+            }
+        }
     }
 }

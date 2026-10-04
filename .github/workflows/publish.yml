@@ -34,8 +34,11 @@ jobs:
       - name: Restore
         run: dotnet restore "src/PreRelease DeList.slnx"
 
-      - name: Build (packs the tool package via GeneratePackageOnBuild)
+      - name: Build
         run: dotnet build -c Release --no-restore "src/PreRelease DeList.slnx"
+
+      - name: Pack
+        run: dotnet pack src/PreReleaseDelistCli/PreReleaseDelistCli.csproj -c Release --no-build
 
       # Get a short-lived NuGet API key
       - name: NuGet login (OIDC → temp API key)

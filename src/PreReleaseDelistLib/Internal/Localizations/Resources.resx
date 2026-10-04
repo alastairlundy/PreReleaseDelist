@@ -24,4 +24,7 @@
     <data name="Info.Package.AlreadyDelisted" xml:space="preserve">
         <value>Package already de-listed.</value>
     </data>
+    <data name="Errors.Package.VersionNotFoundOnServer" xml:space="preserve">
+        <value>Version "{0}" was not found on Nuget Server for package "{1}".</value>
+    </data>
 </root>

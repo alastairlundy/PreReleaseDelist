@@ -16,6 +16,7 @@ A CLI to delist pre-release versions of your NuGet package(s).
 - Delist specific pre-release versions of a NuGet package.
 - Delist all pre-release versions of a NuGet package.
 - Configure NuGet API Key and Server URL via environment variables.
+- Distinguishes a version that is already delisted from a version the server has never heard of, so a mistyped version string is reported as a failure rather than a silent success.
 
 ## Installation
 
@@ -55,6 +56,20 @@ dotnet build -c Release
 | `--non-interactive`     | boolean         | No                                  | `false`                               | Print a machine-friendly `Version=<version> Status=<Success\|Failure> ...` line per version and exit with a non-zero code if any version failed to delist. Useful in CI. |
 
 \* Required either on the command line or via environment variable (see Configuration below).
+
+### Version States
+
+Each requested version resolves to exactly one of three outcomes:
+
+| State                                | `--non-interactive` output     | Exit code contribution |
+|--------------------------------------|--------------------------------|------------------------|
+| Listed on the server                  | `Status=Success`               | 0                      |
+| On the server but already delisted   | `Status=Success Info='...'`    | 0                      |
+| Not known to the server at all       | `Status=Failure Error='...'`   | 1                      |
+
+A version the server has never heard of — a typo, or a version that was never published — is
+reported as a **failure**, not as "already delisted". Versions that do need deleting are still
+processed, so one bad entry in a batch does not prevent the rest from being delisted.
 
 ### Environment Variables
 

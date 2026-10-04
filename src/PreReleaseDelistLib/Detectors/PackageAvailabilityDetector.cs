@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using EnhancedLinq.Deferred;
 
 namespace PreReleaseDelistLib.Detectors;
 

@@ -50,8 +50,11 @@ public class DelistCommand
     [CliOption(Name = "--use-strict-parsing")]
     public bool UseStrictParsing { get; set; } = true;
     
-    [CliArgument(Name = "versions")]
-    public string[] Versions { get; set; } = null!;
+    /// <summary>
+    /// The pre-release versions to delist. Optional when <see cref="DelistAllVersions"/> is set.
+    /// </summary>
+    [CliArgument(Name = "versions", Required = false)]
+    public string[] Versions { get; set; } = [];
     
     [CliOption(Name = "--api-key", Required = false)]
     [DefaultValue(null)]
@@ -97,11 +100,17 @@ public class DelistCommand
                     ? Environment.GetEnvironmentVariable("NUGET_SERVER_URL")!
                     : "https://api.nuget.org/v3/index.json"));
 
+        // DotMake leaves the bound array empty when the argument is omitted, so --delist-all works without
+        // any positional versions.
+        string[] requestedVersions = Versions ?? [];
+
         if (!DelistAllVersions)
         {
-            Versions = Versions.Where(s => !string.IsNullOrWhiteSpace(s) && char.IsDigit(s.Trim()[0])).ToArray();
+            requestedVersions = requestedVersions
+                .Where(s => !string.IsNullOrWhiteSpace(s) && char.IsDigit(s.Trim()[0]))
+                .ToArray();
 
-            if (Versions.Length == 0)
+            if (requestedVersions.Length == 0)
             {
                 await Console.Error.WriteLineAsync(Resources.Errors_Input_NoVersionStrings);
                 return -1;
@@ -134,7 +143,7 @@ public class DelistCommand
         }
         else
         {
-            IList<NuGetVersion> parsedVersions = ParseVersions(Versions, UseStrictParsing);
+            IList<NuGetVersion> parsedVersions = ParseVersions(requestedVersions, UseStrictParsing);
 
             results = delistService.RequestPackageDelistingAsync(serverUrl, nugetApiKey,
                 PackageId, parsedVersions, cts.Token);
