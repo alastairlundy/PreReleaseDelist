@@ -16,6 +16,7 @@
         <Copyright>Copyright (c) 2026 Alastair Lundy</Copyright>
         <RepositoryUrl>https://github.com/alastairlundy/PreReleaseDelist</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
+        <PackageTags>delist;nuget;dotnet-tool;cli;unlist</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>
