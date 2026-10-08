@@ -1,4 +1,4 @@
-﻿/*
+/*
     PreReleaseDelistLib
     Copyright (C) 2026 Alastair Lundy
 
@@ -31,9 +31,8 @@ public interface IPackageDelistService
     /// <param name="packageName">The name of the package from which pre-release versions are to be delisted.</param>
     /// <param name="includeZeroMajorVersions">When true, stable versions with Major == 0 are also delisted alongside prerelease versions.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to request cancellation of the operation.</param>
-    /// <returns>An asynchronous sequence of tuples containing the version being processed, a boolean indicating whether
-    /// the delisting was successful or the version is already unlisted, and a response message from the API.</returns>
-    IAsyncEnumerable<(NuGetVersion version, bool delistSuccess, string responseMessage)> RequestPackageDelistingAsync(
+    /// <returns>An asynchronous sequence containing one <see cref="PackageVersionOutcome"/> per requested version.</returns>
+    IAsyncEnumerable<PackageVersionOutcome> RequestPackageDelistingAsync(
         string nugetApiUrl, string nugetApiKey, string packageName, bool includeZeroMajorVersions = false,
         CancellationToken cancellationToken = default);
 
@@ -45,8 +44,7 @@ public interface IPackageDelistService
     /// <param name="packageName">The name of the package from which pre-release versions are to be delisted.</param>
     /// <param name="versions">The specific versions to delist.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to request cancellation of the operation.</param>
-    /// <returns>An asynchronous sequence of tuples containing the version being processed, a boolean indicating whether
-    /// the delisting was successful or the version is already unlisted, and a response message from the API.</returns>
-    IAsyncEnumerable<(NuGetVersion version, bool delistSuccess, string responseMessage)> RequestPackageDelistingAsync(
+    /// <returns>An asynchronous sequence containing one <see cref="PackageVersionOutcome"/> per requested version.</returns>
+    IAsyncEnumerable<PackageVersionOutcome> RequestPackageDelistingAsync(
         string nugetApiUrl, string nugetApiKey, string packageName, IList<NuGetVersion> versions, CancellationToken cancellationToken);
 }

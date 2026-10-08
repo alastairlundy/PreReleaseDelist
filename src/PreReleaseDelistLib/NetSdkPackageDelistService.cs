@@ -1,4 +1,4 @@
-﻿/*
+/*
     PreReleaseDelistLib
     Copyright (C) 2026 Alastair Lundy
 
@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-using CliInvoke.Core;
 using PreReleaseDelistLib.Internal;
 
 namespace PreReleaseDelistLib;
@@ -30,21 +29,55 @@ namespace PreReleaseDelistLib;
 /// This is inherent to the <c>dotnet nuget delete</c> command and cannot be avoided.
 /// Consider using the HTTP-based <see cref="PackageDelistService"/> where possible for improved security.
 /// </para>
+/// <para>
+/// Per-version delete requests are dispatched through the injected <see cref="IPackageVersionDeleter"/>
+/// backend (<see cref="SdkPackageVersionDeleter"/>); this composing service owns only the per-run state:
+/// enumerating the request, bucketing it via <see cref="DelistPlanning.Partition"/>, merging bucket and
+/// backend outcomes into one outcome per requested version, and the fail-fast rate-limit rule.
+/// </para>
 /// </remarks>
 public class NetSdkPackageDelistService : IPackageDelistService
 {
     private readonly IPackageVersionService _packageVersionService;
     private readonly IPackageAvailabilityDetector _packageAvailabilityDetector;
-    private readonly IProcessInvoker _processInvoker;
+    private readonly IPackageVersionDeleter _versionDeleter;
+    private readonly bool _isRateLimitedDecorated;
 
+    /// <summary>
+    /// Creates a service that dispatches delete requests through <paramref name="versionDeleter"/>.
+    /// </summary>
+    /// <param name="packageVersionService">Service used to enumerate and check package versions.</param>
+    /// <param name="packageAvailabilityDetector">Detector used to verify the package exists on the server.</param>
+    /// <param name="versionDeleter">The per-version delete backend to dispatch to-delist versions through.</param>
+    /// <param name="isRateLimitedDecorated">Whether the injected deleter's pipeline reports rate-limit
+    /// outcomes. Set from the DI composition root (ticket 008); defaults to <see langword="false"/> so the
+    /// existing composition root keeps constructing this service until that wiring lands.</param>
     public NetSdkPackageDelistService(IPackageVersionService packageVersionService,
         IPackageAvailabilityDetector packageAvailabilityDetector,
-        IProcessInvoker processInvoker)
+        IPackageVersionDeleter versionDeleter,
+        bool isRateLimitedDecorated = false)
     {
+        ArgumentNullException.ThrowIfNull(packageVersionService);
+        ArgumentNullException.ThrowIfNull(packageAvailabilityDetector);
+        ArgumentNullException.ThrowIfNull(versionDeleter);
+
         _packageVersionService = packageVersionService;
         _packageAvailabilityDetector = packageAvailabilityDetector;
-        _processInvoker = processInvoker;
+        _versionDeleter = versionDeleter;
+        _isRateLimitedDecorated = isRateLimitedDecorated;
     }
+
+    /// <summary>
+    /// Whether the injected deleter's pipeline reports rate-limit outcomes. Composition (ticket 008) sets it
+    /// to <see langword="true"/> for the in-box backends, which detect 429 themselves; a future rate-limit
+    /// decorator that swallows or delays those signals flips the flag there instead of in this service.
+    /// </summary>
+    /// <remarks>
+    /// The fail-fast rule still stops the run on a <see cref="PackageVersionStatus.RateLimited"/> outcome
+    /// when the flag is <see langword="false"/>, because an unexpected rate-limit signal is safer to stop on
+    /// than to ignore.
+    /// </remarks>
+    public bool IsRateLimitedDecorated => _isRateLimitedDecorated;
 
     /// <summary>
     /// Asynchronously delists all prerelease versions of a NuGet package to be delisted based on the provided API credentials and package ID.
@@ -54,21 +87,21 @@ public class NetSdkPackageDelistService : IPackageDelistService
     /// <param name="packageId">The identifier of the package(s) to be delisted.</param>
     /// <param name="includeZeroMajorVersions">When true, stable versions with Major == 0 are also delisted alongside prerelease versions.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the operation.</param>
-    /// <returns>A sequence of tuples containing the version, whether the delisting was successful, and any response message from the API.</returns>
-    public async IAsyncEnumerable<(NuGetVersion version, bool delistSuccess, string responseMessage)>
-        RequestPackageDelistingAsync(string nugetApiUrl, string nugetApiKey,
-            string packageId, bool includeZeroMajorVersions = false,
-            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    /// <returns>A sequence containing one <see cref="PackageVersionOutcome"/> per requested version.</returns>
+    public async IAsyncEnumerable<PackageVersionOutcome> RequestPackageDelistingAsync(
+        string nugetApiUrl, string nugetApiKey,
+        string packageId, bool includeZeroMajorVersions = false,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         NuGetVersion[] versionsToDelist = await _packageVersionService.GetPrereleasePackageVersionsAsync
             (nugetApiUrl, nugetApiKey, packageId, includeZeroMajorVersions, cancellationToken);
-        
-        IAsyncEnumerable<(NuGetVersion version, bool delistSuccess, string responseMessage)> delistResults =
+
+        IAsyncEnumerable<PackageVersionOutcome> delistResults =
             RequestPackageDelistingAsync(nugetApiUrl, nugetApiKey, packageId, versionsToDelist, cancellationToken);
 
-        await foreach ((NuGetVersion version, bool delistSuccess, string responseMessage) result in delistResults)
+        await foreach (PackageVersionOutcome outcome in delistResults)
         {
-            yield return (result.version, result.delistSuccess, result.responseMessage);
+            yield return outcome;
         }
     }
 
@@ -80,10 +113,22 @@ public class NetSdkPackageDelistService : IPackageDelistService
     /// <param name="packageId">The identifier of the package(s) to be delisted.</param>
     /// <param name="versions">The package versions to delist.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the operation.</param>
-    /// <returns>A sequence of tuples containing the version, whether the delisting was successful, and any response message from the API.</returns>
-    public async IAsyncEnumerable<(NuGetVersion version, bool delistSuccess, string responseMessage)>
-        RequestPackageDelistingAsync(string nugetApiUrl, string nugetApiKey, string packageId, IList<NuGetVersion> versions,
-            [EnumeratorCancellation] CancellationToken cancellationToken)
+    /// <returns>A sequence containing one <see cref="PackageVersionOutcome"/> per requested version.</returns>
+    /// <remarks>
+    /// <para>
+    /// Already-delisted and not-on-server versions are reported from the plan's buckets; only
+    /// <c>plan.ToDelist</c> versions are dispatched to the injected deleter, so every requested version
+    /// yields exactly one outcome.
+    /// </para>
+    /// <para>
+    /// Fail-fast: when a dispatch reports <see cref="PackageVersionStatus.RateLimited"/>, no further
+    /// dispatches are made and every remaining to-delist version is reported as
+    /// <see cref="PackageVersionStatus.NotAttempted"/> rather than <see cref="PackageVersionStatus.Failed"/>.
+    /// </para>
+    /// </remarks>
+    public async IAsyncEnumerable<PackageVersionOutcome> RequestPackageDelistingAsync(
+        string nugetApiUrl, string nugetApiKey, string packageId, IList<NuGetVersion> versions,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(nugetApiUrl);
         ArgumentException.ThrowIfNullOrEmpty(nugetApiKey);
@@ -103,48 +148,34 @@ public class NetSdkPackageDelistService : IPackageDelistService
 
         foreach (NuGetVersion version in plan.AlreadyDelisted)
         {
-            yield return new ValueTuple<NuGetVersion, bool, string>(version, true, Resources.Info_Package_AlreadyDelisted);
+            yield return new PackageVersionOutcome(packageId, version, PackageVersionStatus.AlreadyDelisted);
         }
 
         foreach (NuGetVersion version in plan.NotOnServer)
         {
-            yield return new ValueTuple<NuGetVersion, bool, string>(version, false,
-                string.Format(Resources.Errors_Package_VersionNotFoundOnServer,
-                    version.ToNormalizedString(), packageId));
+            yield return new PackageVersionOutcome(packageId, version, PackageVersionStatus.NotOnServer);
         }
+
+        if (plan.ToDelist.Count == 0)
+            yield break;
+
+        bool rateLimitStop = false;
 
         foreach (NuGetVersion version in plan.ToDelist)
         {
-            ProcessConfiguration configuration = new()
+            if (rateLimitStop)
             {
-                TargetFilePath = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet",
-                OutputRedirection = true,
-                ArgumentList =
-                [
-                    "nuget", "delete",
-                    packageId.ToLowerInvariant(),
-                    version.ToNormalizedString(),
-                    "--api-key", nugetApiKey,
-                    "--source", nugetApiUrl,
-                    "--non-interactive"
-                ]
-            };
-            
-            BufferedProcessResult result = await _processInvoker.ExecuteBufferedAsync(configuration,
-                new ProcessExitConfiguration(),
-                cancellationToken);
+                yield return new PackageVersionOutcome(packageId, version, PackageVersionStatus.NotAttempted);
+                continue;
+            }
 
-            if (result.ExitCode == 0)
-            {
-                yield return new ValueTuple<NuGetVersion, bool, string>(version, true, "");
-            }
-            else
-            {
-                string failureMessage = string.IsNullOrEmpty(result.StandardError)
-                    ? result.StandardOutput
-                    : $"{result.StandardOutput} {result.StandardError}".Trim();
-                yield return new ValueTuple<NuGetVersion, bool, string>(version, false, failureMessage);
-            }
+            PackageVersionOutcome outcome = await _versionDeleter.DeleteAsync(nugetApiUrl, packageId, version,
+                nugetApiKey, cancellationToken);
+
+            yield return outcome;
+
+            if (outcome.Status == PackageVersionStatus.RateLimited)
+                rateLimitStop = true;
         }
     }
 }
