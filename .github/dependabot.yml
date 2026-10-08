@@ -25,3 +25,19 @@ updates:
     directory: "/src" # Location of package manifests
     schedule:
       interval: "daily"
+    groups:
+      # Minor and patch bumps are grouped into a single pull request per
+      # update run, so one-off version bumps stop landing as separate PRs.
+      nuget-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+  # Workflow dependencies (actions pinned by SHA in .github/workflows/).
+  # For the github-actions ecosystem the directory must be "/" - Dependabot
+  # searches .github/workflows itself (plus a root action.yml/action.yaml).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"

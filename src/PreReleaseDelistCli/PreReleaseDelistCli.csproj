@@ -2,8 +2,7 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <ImplicitUsings>disable</ImplicitUsings>
-        <Nullable>enable</Nullable>
+        <!-- LangVersion, Nullable and ImplicitUsings come from Directory.Build.props. -->
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>prerelease-delist</ToolCommandName>
         <RollForward>Major</RollForward>

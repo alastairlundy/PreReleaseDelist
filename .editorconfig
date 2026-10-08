@@ -1,0 +1,24 @@
+# EditorConfig: https://editorconfig.org
+# Repo-wide formatting defaults. Build enforcement (warnings-as-errors and
+# code-style rules at build time) lives in Directory.Build.props.
+
+root = true
+
+# Default for every file
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# C# source: namespaces must be file-scoped. Severity is "warning" so that
+# EnforceCodeStyleInBuild + TreatWarningsAsErrors turn violations into build
+# failures (generated files such as *.Designer.cs are exempt).
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+
+# YAML and JSON keep the conventional two-space indent
+[*.{yml,yaml,json}]
+indent_size = 2

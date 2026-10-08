@@ -31,6 +31,16 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      # Gate: tests must pass before anything is restored for packing, built,
+      # packed or pushed. This run restores and builds Release itself; until
+      # ticket 013 lands the dedicated test project it exercises the fuzz
+      # suite. Per DECISIONS-prerelease-delist-1.0-readiness.md#T008/#T011.
+      - name: Test
+        run: dotnet test "src/PreRelease DeList.slnx" -c Release
+
+      # Restore also runs the NuGet audit against the unlocked dependency
+      # graph (NuGetAudit=true, NuGetAuditMode=all in Directory.Build.props);
+      # any reported vulnerability fails the job here. No lockfile is used.
       - name: Restore
         run: dotnet restore "src/PreRelease DeList.slnx"
 

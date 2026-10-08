@@ -1,0 +1,30 @@
+<Project>
+  <!--
+    Shared build policy for every project in the repository (src/ and tests/).
+    Project files carry only project-specific settings; anything that applies
+    repo-wide belongs here.
+    Per docs/decisions/DECISIONS-prerelease-delist-1.0-readiness.md#T011.
+  -->
+  <PropertyGroup>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <!--
+      Implicit usings are aligned to "enable" across all projects. The CLI
+      previously set "disable" with no recorded rationale; both projects ship
+      explicit GlobalUsings.cs files that stay valid either way, so enabling
+      is the lower-friction default.
+    -->
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!--
+      NuGet audit covers the whole dependency graph (direct + transitive).
+      Findings surface as NU190x warnings during restore and fail the build
+      via TreatWarningsAsErrors. The restore lockfile (packages.lock.json in
+      locked mode) is deliberately excluded by T011: audit runs against the
+      unlocked graph where transitive versions float.
+    -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+  </PropertyGroup>
+</Project>
