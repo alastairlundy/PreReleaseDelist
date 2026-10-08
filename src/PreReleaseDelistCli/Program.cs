@@ -1,4 +1,4 @@
-﻿/*
+/*
     prerelease-delist - Delist pre-release package versions from a Nuget Server
     Copyright (C) 2026 Alastair Lundy
 
@@ -24,8 +24,24 @@ Cli.Ext.ConfigureServices(services =>
     services.AddHttpClient()
         .AddSingleton<IPackageAvailabilityDetector, PackageAvailabilityDetector>()
         .AddSingleton<IPackageVersionService, PackageVersionService>()
-        .AddKeyedSingleton<IPackageDelistService, PackageDelistService>("http")
-        .AddKeyedSingleton<IPackageDelistService, NetSdkPackageDelistService>("sdk")
+        // Per-version delete backends keyed to the exact vocabulary the --backend option accepts.
+        .AddKeyedSingleton<IPackageVersionDeleter, HttpPackageVersionDeleter>("http")
+        .AddKeyedSingleton<IPackageVersionDeleter, SdkPackageVersionDeleter>("sdk")
+        // Each composing service receives its keyed backend plus IsRateLimitedDecorated=true: both in-box
+        // backends detect 429 themselves, so the fail-fast state machine lives inside the services. A future
+        // rate-limit decorator that swallows or delays those signals flips this flag here instead.
+        .AddKeyedSingleton<IPackageDelistService>("http", static (serviceProvider, _) =>
+            new PackageDelistService(
+                serviceProvider.GetRequiredService<IPackageVersionService>(),
+                serviceProvider.GetRequiredService<IPackageAvailabilityDetector>(),
+                serviceProvider.GetRequiredKeyedService<IPackageVersionDeleter>("http"),
+                isRateLimitedDecorated: true))
+        .AddKeyedSingleton<IPackageDelistService>("sdk", static (serviceProvider, _) =>
+            new NetSdkPackageDelistService(
+                serviceProvider.GetRequiredService<IPackageVersionService>(),
+                serviceProvider.GetRequiredService<IPackageAvailabilityDetector>(),
+                serviceProvider.GetRequiredKeyedService<IPackageVersionDeleter>("sdk"),
+                isRateLimitedDecorated: true))
         .AddCliInvoke(ServiceLifetime.Singleton);
 
     ConfigurationBuilder configurationBuilder = new();
