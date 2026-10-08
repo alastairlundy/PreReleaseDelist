@@ -21,8 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - Removed the `IsTrimmable` / `IsAoTCompatible` claims. Both a trimmed and a Native AOT publish
   build successfully and then fail at runtime, because `NuGet.Protocol` deserialises repository
-  signature resources with Newtonsoft.Json reflection that the trimmer removes. See
-  [ADR 0001](docs/decisions/0001-no-trimming-or-native-aot.md).
+  signature resources with Newtonsoft.Json reflection that the trimmer removes.
 - `GeneratePackageOnBuild` is replaced by an explicit `dotnet pack` step in `publish.yml`. Every
   local `dotnet build` no longer produces a `.nupkg`.
 - Removed the `EnhancedLinq` dependency. It was only ever used for one `Exclude` call per delist

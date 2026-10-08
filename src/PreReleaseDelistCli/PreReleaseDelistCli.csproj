@@ -6,14 +6,6 @@
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>prerelease-delist</ToolCommandName>
         <RollForward>Major</RollForward>
-        <!--
-          This tool is NOT trim- or AOT-compatible. NuGet.Protocol deserialises repository signature
-          resources with Newtonsoft.Json reflection, which the trimmer removes, so both a trimmed and a
-          Native AOT publish build successfully and then fail at runtime with
-          "Unable to find a constructor to use for type NuGet.Protocol.RepositoryCertificateInfo".
-          Do not re-add IsTrimmable / IsAoTCompatible without a passing end-to-end run against a real
-          NuGet feed. See docs/decisions/0001-no-trimming-or-native-aot.md.
-        -->
         <AssemblyName>prerelease-delist</AssemblyName>
         <Title>PreReleaseDelist</Title>
         <Authors>Alastair Lundy</Authors>

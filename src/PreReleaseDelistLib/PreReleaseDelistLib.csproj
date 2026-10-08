@@ -5,10 +5,6 @@
         <TargetFramework>net10.0</TargetFramework>
         <IsPackable>false</IsPackable>
         <PackageLicenseExpression>LGPL-3.0+</PackageLicenseExpression>
-        <!--
-          Not trim- or AOT-compatible: NuGet.Protocol's Newtonsoft-based repository signature
-          deserialization does not survive trimming. See docs/decisions/0001-no-trimming-or-native-aot.md.
-        -->
         <PolyArgumentExceptions>true</PolyArgumentExceptions>
         <PackageId>PreReleaseDelist.Lib</PackageId>
         <Title>PreReleaseDelist.Lib</Title>
