@@ -59,3 +59,160 @@ jobs:
 
       - name: Push to NuGet.org with trusted publishing
         run: dotnet nuget push "src/PreReleaseDelistCli/bin/Release/*.nupkg" --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  # Test gate for the RID asset channel (TK012). The publish job above keeps
+  # ticket 001's inline test step for the NuGet channel; this job exists so the
+  # six RID builds also start from a passing tree without running the suite six
+  # more times in parallel. Per DECISIONS-prerelease-delist-1.0-readiness.md#T008.
+  test:
+    name: Test gate (RID asset channel)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test
+        run: dotnet test "src/PreRelease DeList.slnx" -c Release
+
+  build-assets:
+    name: Build ${{ matrix.rid }} asset
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      # One failing RID must not cancel the other five: a release wants the
+      # full picture of which platforms built.
+      fail-fast: false
+      matrix:
+        # Exactly the six RIDs of DECISIONS-prerelease-delist-1.0-readiness.md#T019
+        # (Option A minus both musl RIDs) — musl/Alpine users are served by the
+        # dotnet tool channel, noted in the README. Adding a RID later is one
+        # line here, not a decision reversal.
+        rid:
+          - win-x64
+          - win-arm64
+          - linux-x64
+          - linux-arm64
+          - osx-x64
+          - osx-arm64
+
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      # Self-contained single-file publish: the resulting binary runs the HTTP
+      # backend with no .NET installed (the SDK backend still needs a host SDK
+      # — packaging cannot change that, README channel 2). No trim or AOT
+      # flags anywhere (D002); adding one would be a decision reversal.
+      - name: Publish (self-contained, single file)
+        run: >
+          dotnet publish src/PreReleaseDelistCli/PreReleaseDelistCli.csproj
+          -c Release --self-contained true -p:PublishSingleFile=true
+          -r ${{ matrix.rid }} -o publish/${{ matrix.rid }}
+
+      - name: Zip the artifact
+        run: |
+          set -euo pipefail
+          shopt -s dotglob
+          mkdir -p dist
+          zip -9 -r -j "dist/prerelease-delist-${{ matrix.rid }}.zip" "publish/${{ matrix.rid }}"/*
+
+      # GitHub publishes no checksums, so the workflow computes them (T019):
+      # one `.sha256` file per artifact, written from inside the directory so
+      # the recorded name carries no path prefix and `sha256sum -c` works
+      # straight on the downloaded release asset. The self-check proves the
+      # emitted line is in `sha256sum -c` format before anything ships.
+      - name: Generate the artifact's SHA-256 checksum
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum "prerelease-delist-${{ matrix.rid }}.zip" > "prerelease-delist-${{ matrix.rid }}.zip.sha256"
+          sha256sum -c "prerelease-delist-${{ matrix.rid }}.zip.sha256"
+
+      - name: Upload the zip and its checksum
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: rid-${{ matrix.rid }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          # The GitHub Release assets are the durable copy; these are staging.
+          retention-days: 7
+
+  release-assets:
+    name: Attach assets to the GitHub Release
+    needs: build-assets
+    runs-on: ubuntu-latest
+    # Job-scoped: attaching assets is the one step here that needs a write
+    # token, so only this job asks for one — everything else stays read-only.
+    permissions:
+      contents: write
+
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+
+      - name: Download the RID artifacts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          pattern: rid-*
+          path: dist
+          merge-multiple: true
+
+      # One combined checksum file listing every artifact-checksum pair, so a
+      # user who downloads all six zips verifies them with a single
+      # `sha256sum -c sha256.txt`. Built and self-checked even on manual runs,
+      # where there is no release to attach to yet.
+      - name: Build the combined sha256.txt
+        run: |
+          set -euo pipefail
+          cd dist
+          : > sha256.txt
+          for checksum in *.zip.sha256; do
+            cat "$checksum" >> sha256.txt
+          done
+          sha256sum -c sha256.txt
+
+      # workflow_dispatch runs have no release to attach to; they still
+      # exercise the build and checksum steps above.
+      - name: Attach zips and checksum files to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: >-
+          gh release upload "$RELEASE_TAG"
+          dist/*.zip dist/*.sha256 dist/sha256.txt
+          --clobber
