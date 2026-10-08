@@ -3,6 +3,10 @@
 # Please see the documentation for all configuration options:
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
+# Version updates run weekly (Mondays) with a 14-day cooldown so fast-moving
+# packages don't open a PR per release. Cooldown only applies to version
+# updates; Dependabot security updates are unaffected.
+
 version: 2
 updates:
   # Dependabot's NuGet updater only looks for entry points that sit *directly* in
@@ -21,7 +25,10 @@ updates:
   # resolves the nearest Directory.Packages.props by walking up from each project,
   # so both src/Directory.Packages.props and tests/Directory.Packages.props are
   # updated rather than versions being inlined into the project files.
-  - package-ecosystem: "nuget" # See documentation for possible values
-    directory: "/src" # Location of package manifests
+  - package-ecosystem: "nuget"
+    directory: "/src"
     schedule:
-      interval: "daily"
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 14
