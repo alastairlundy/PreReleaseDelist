@@ -249,18 +249,38 @@ public class CliIntegrationExitCodeTests
     }
 
     [Test]
-    public async Task MissingRequiredOption_ReportsItOnStderr_AndExitsADocumentedCode()
+    public async Task MissingRequiredOption_ReportsItOnStderr_AndExitsOneAsDocumented()
     {
         using MockNuGetV3Server server = MockNuGetV3Server.Start();
 
         CommandRun run = await CliIntegrationHarness.RunAsync(
             "--server-url", server.ServiceIndexUrl);
 
-        // The exact choice between 1 and 2 for a parser-level failure belongs to the argument
-        // parser; T005's constraint is that the process never leaves the documented set.
-        await Assert.That(run.ExitCode is 0 or 1 or 2 or 3 or 4 or 130).IsTrue();
+        // README "Exit codes": command lines the argument parser rejects exit 1 with the parser's
+        // message on stderr, before the CLI's own validation runs and before any request is made.
+        await Assert.That(run.ExitCode).IsEqualTo(DelistCommand.ExitFailure);
         await Assert.That(run.StdErr).Contains("--package-id");
         await Assert.That(run.StdOut).IsEmpty();
+        await Assert.That(server.Requests).IsEmpty();
+    }
+
+    [Test]
+    public async Task OptionMissingItsValue_ReportsItOnStderr_AndExitsOneAsDocumented()
+    {
+        using MockNuGetV3Server server = MockNuGetV3Server.Start();
+        string packageId = NewPackageId("ExitParseValue");
+
+        CommandRun run = await CliIntegrationHarness.RunAsync(
+            "--package-id", packageId,
+            "--server-url", server.ServiceIndexUrl,
+            "--api-key");
+
+        // The other parser-level rejection named in README "Exit codes": the option is present but
+        // has no value, so the run is refused before it starts.
+        await Assert.That(run.ExitCode).IsEqualTo(DelistCommand.ExitFailure);
+        await Assert.That(run.StdErr).Contains("--api-key");
+        await Assert.That(run.StdOut).IsEmpty();
+        await Assert.That(server.Requests).IsEmpty();
     }
 
     private static string NewPackageId(string scenario)

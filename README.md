@@ -144,11 +144,13 @@ The CLI exits only with these codes:
 | Code  | Meaning                                                                                                                                   |
 |-------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | `0`   | Success — every requested version was delisted or was already delisted.                                                                     |
-| `1`   | At least one version failed, including a version the server does not have (`not-on-server`).                                                |
-| `2`   | Usage or validation failure — bad options, a missing API key on a real run, a package that does not exist on the server, or an invalid version string under strict parsing. |
+| `1`   | At least one version failed, including a version the server does not have (`not-on-server`); also command-line errors the argument parser rejects (see below). |
+| `2`   | Validation failure detected by the CLI itself — an empty `--package-id`, an invalid `--backend` or `--output` value, no version strings without `--delist-all`, a missing API key on a real run, a package that does not exist on the server, or an invalid version string under strict parsing. |
 | `3`   | The server rate-limited the run; the run stopped fail-fast and reported the results so far.                                                 |
 | `4`   | The run was cancelled; the remaining versions were not attempted.                                                                          |
 | `130` | Interrupted with Ctrl-C.                                                                                                                   |
+
+Command lines that the argument parser rejects outright — a missing required option such as `--package-id`, or an option missing its value — never reach that validation: the parser writes its message to stderr and the process exits `1` without contacting the server.
 
 When a run produces more than one of these codes, the most severe wins: `3` beats `4`, which beats `1`, which beats `0`. `--dry-run` reuses `0`, `1`, and `2` only.
 
