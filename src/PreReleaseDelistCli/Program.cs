@@ -27,21 +27,18 @@ Cli.Ext.ConfigureServices(services =>
         // Per-version delete backends keyed to the exact vocabulary the --backend option accepts.
         .AddKeyedSingleton<IPackageVersionDeleter, HttpPackageVersionDeleter>("http")
         .AddKeyedSingleton<IPackageVersionDeleter, SdkPackageVersionDeleter>("sdk")
-        // Each composing service receives its keyed backend plus IsRateLimitedDecorated=true: both in-box
-        // backends detect 429 themselves, so the fail-fast state machine lives inside the services. A future
-        // rate-limit decorator that swallows or delays those signals flips this flag here instead.
+        // Each composing service receives its keyed backend; both in-box backends detect 429
+        // themselves, so the fail-fast state machine lives inside the services.
         .AddKeyedSingleton<IPackageDelistService>("http", static (serviceProvider, _) =>
             new PackageDelistService(
                 serviceProvider.GetRequiredService<IPackageVersionService>(),
                 serviceProvider.GetRequiredService<IPackageAvailabilityDetector>(),
-                serviceProvider.GetRequiredKeyedService<IPackageVersionDeleter>("http"),
-                isRateLimitedDecorated: true))
+                serviceProvider.GetRequiredKeyedService<IPackageVersionDeleter>("http")))
         .AddKeyedSingleton<IPackageDelistService>("sdk", static (serviceProvider, _) =>
             new NetSdkPackageDelistService(
                 serviceProvider.GetRequiredService<IPackageVersionService>(),
                 serviceProvider.GetRequiredService<IPackageAvailabilityDetector>(),
-                serviceProvider.GetRequiredKeyedService<IPackageVersionDeleter>("sdk"),
-                isRateLimitedDecorated: true))
+                serviceProvider.GetRequiredKeyedService<IPackageVersionDeleter>("sdk")))
         .AddCliInvoke(ServiceLifetime.Singleton);
 
     ConfigurationBuilder configurationBuilder = new();

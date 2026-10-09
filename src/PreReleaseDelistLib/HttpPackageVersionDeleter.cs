@@ -22,10 +22,18 @@ namespace PreReleaseDelistLib;
 /// HTTP delete backend behind the per-version delete seam.
 /// </summary>
 /// <remarks>
+/// <para>
 /// One version goes in, one <see cref="PackageVersionOutcome"/> comes out.
 /// The publish URL is resolved per call inside this backend via the service index,
 /// so a single instance may serve multiple sources.
 /// No retry logic of any kind lives here; the fail-fast rule belongs to the composing service.
+/// </para>
+/// <para>
+/// A 404 is only reported as <see cref="PackageVersionStatus.AlreadyDelisted"/> when the server's
+/// service index advertised the <c>PackagePublish/2.0.0</c> endpoint the delete actually went to.
+/// When that endpoint is absent and the delete fell back to the raw server URL, a 404 cannot be
+/// interpreted and stays a <see cref="PackageVersionStatus.Failed"/> outcome.
+/// </para>
 /// </remarks>
 public sealed class HttpPackageVersionDeleter : IPackageVersionDeleter
 {
@@ -67,6 +75,12 @@ public sealed class HttpPackageVersionDeleter : IPackageVersionDeleter
 
             Uri? publishUrl = serviceIndex?.GetServiceEntryUri("PackagePublish/2.0.0");
 
+            // A 404 only means "already delisted" when the delete actually went to the server's
+            // declared publish endpoint. When the service index did not advertise one and the run
+            // fell back to the raw server URL, a 404 says nothing about the version's state, so the
+            // delete stays a plain failure instead of a false success.
+            bool resolvedPublishUrl = publishUrl is not null;
+
             publishUrl ??= new Uri(nugetApiUrl);
 
             HttpClient client = _clientFactory.CreateClient();
@@ -85,7 +99,7 @@ public sealed class HttpPackageVersionDeleter : IPackageVersionDeleter
                 return new PackageVersionOutcome(packageId, version, PackageVersionStatus.Delisted);
             }
 
-            if ((int)response.StatusCode == 404)
+            if ((int)response.StatusCode == 404 && resolvedPublishUrl)
             {
                 return new PackageVersionOutcome(packageId, version, PackageVersionStatus.AlreadyDelisted);
             }
@@ -97,8 +111,14 @@ public sealed class HttpPackageVersionDeleter : IPackageVersionDeleter
 
             return new PackageVersionOutcome(packageId, version, PackageVersionStatus.Failed);
         }
-        catch
+        catch (Exception exception) when (exception is not OperationCanceledException
+            || !cancellationToken.IsCancellationRequested)
         {
+            // Server-side faults become a Failed outcome. A cancellation of the caller's token is
+            // deliberately not converted: it escapes so the composing service and the command
+            // boundary can report the run as interrupted instead of as a wall of Failed outcomes.
+            // An OperationCanceledException that is not caused by the caller's token (for example
+            // the HttpClient timeout) stays a Failed outcome.
             return new PackageVersionOutcome(packageId, version, PackageVersionStatus.Failed);
         }
     }

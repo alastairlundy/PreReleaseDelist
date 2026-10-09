@@ -72,6 +72,23 @@ public class HttpDeleterMappingTests
     }
 
     [Test]
+    public async Task DeleteAsync_WithNotFoundOnTheFallbackRoute_YieldsFailed()
+    {
+        // Without a PackagePublish/2.0.0 entry in the service index the delete goes to the raw
+        // server URL; a 404 from that route says nothing about the version's listing state, so it
+        // must not be reported as an already-delisted success.
+        using LoopbackServiceIndexServer server = LoopbackServiceIndexServer.Start(includePublishEntry: false);
+        ScriptedHttpMessageHandler handler = new();
+        handler.EnqueueStatusCode(HttpStatusCode.NotFound);
+
+        PackageVersionOutcome outcome = await DeleteThroughStubAsync(server, handler);
+
+        await Assert.That(outcome.Status).IsEqualTo(PackageVersionStatus.Failed);
+        await Assert.That(handler.DispatchedRequests[0].RequestUri)
+            .IsEqualTo($"{server.ServiceIndexUrl}/{PackageId}/1.0.0");
+    }
+
+    [Test]
     public async Task DeleteAsync_WithTooManyRequests_YieldsRateLimited()
     {
         using LoopbackServiceIndexServer server = LoopbackServiceIndexServer.Start();
@@ -110,13 +127,48 @@ public class HttpDeleterMappingTests
         await Assert.That(handler.DispatchCount).IsEqualTo(1);
     }
 
-    /// <summary>Runs one delete through the stubbed handler against the loopback service index.</summary>
+    [Test]
+    public async Task DeleteAsync_WhenTheCallerCancelsMidDispatch_LetsTheCancellationEscape()
+    {
+        using LoopbackServiceIndexServer server = LoopbackServiceIndexServer.Start();
+        ScriptedHttpMessageHandler handler = new();
+        handler.EnqueueException(new TaskCanceledException("simulated Ctrl-C during dispatch"));
+
+        // The caller's token is cancelled before the dispatch: the resulting cancellation must
+        // escape the backend so the run can be reported as interrupted (130), not as Failed.
+        HttpPackageVersionDeleter deleter = new(new StubHttpClientFactory(handler));
+
+        await Assert.That(async () => await deleter.DeleteAsync(
+                server.ServiceIndexUrl, PackageId, NuGetVersion.Parse("1.0.0"), ApiKey,
+                new CancellationToken(canceled: true)))
+            .Throws<OperationCanceledException>();
+        await Assert.That(handler.DispatchCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task DeleteAsync_WhenTheHandlerThrowsACancellationWithoutTheCallerCancelling_YieldsFailed()
+    {
+        using LoopbackServiceIndexServer server = LoopbackServiceIndexServer.Start();
+        ScriptedHttpMessageHandler handler = new();
+        // A TaskCanceledException whose own token is not our caller's token (e.g. the HttpClient
+        // timeout) must stay a Failed outcome, not an interruption.
+        handler.EnqueueException(new TaskCanceledException());
+
+        PackageVersionOutcome outcome = await DeleteThroughStubAsync(server, handler,
+            new CancellationTokenSource().Token);
+
+        await Assert.That(outcome.Status).IsEqualTo(PackageVersionStatus.Failed);
+        await Assert.That(handler.DispatchCount).IsEqualTo(1);
+    }
+
+    /// <summary>Deletes through the stubbed handler against the loopback service index.</summary>
     private static async Task<PackageVersionOutcome> DeleteThroughStubAsync(
-        LoopbackServiceIndexServer server, ScriptedHttpMessageHandler handler)
+        LoopbackServiceIndexServer server, ScriptedHttpMessageHandler handler,
+        CancellationToken cancellationToken = default)
     {
         HttpPackageVersionDeleter deleter = new(new StubHttpClientFactory(handler));
 
         return await deleter.DeleteAsync(server.ServiceIndexUrl, PackageId,
-            NuGetVersion.Parse("1.0.0"), ApiKey);
+            NuGetVersion.Parse("1.0.0"), ApiKey, cancellationToken);
     }
 }

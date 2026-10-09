@@ -41,7 +41,6 @@ public class NetSdkPackageDelistService : IPackageDelistService
     private readonly IPackageVersionService _packageVersionService;
     private readonly IPackageAvailabilityDetector _packageAvailabilityDetector;
     private readonly IPackageVersionDeleter _versionDeleter;
-    private readonly bool _isRateLimitedDecorated;
 
     /// <summary>
     /// Creates a service that dispatches delete requests through <paramref name="versionDeleter"/>.
@@ -49,13 +48,9 @@ public class NetSdkPackageDelistService : IPackageDelistService
     /// <param name="packageVersionService">Service used to enumerate and check package versions.</param>
     /// <param name="packageAvailabilityDetector">Detector used to verify the package exists on the server.</param>
     /// <param name="versionDeleter">The per-version delete backend to dispatch to-delist versions through.</param>
-    /// <param name="isRateLimitedDecorated">Whether the injected deleter's pipeline reports rate-limit
-    /// outcomes. Set from the DI composition root (ticket 008); defaults to <see langword="false"/> so the
-    /// existing composition root keeps constructing this service until that wiring lands.</param>
     public NetSdkPackageDelistService(IPackageVersionService packageVersionService,
         IPackageAvailabilityDetector packageAvailabilityDetector,
-        IPackageVersionDeleter versionDeleter,
-        bool isRateLimitedDecorated = false)
+        IPackageVersionDeleter versionDeleter)
     {
         ArgumentNullException.ThrowIfNull(packageVersionService);
         ArgumentNullException.ThrowIfNull(packageAvailabilityDetector);
@@ -64,20 +59,7 @@ public class NetSdkPackageDelistService : IPackageDelistService
         _packageVersionService = packageVersionService;
         _packageAvailabilityDetector = packageAvailabilityDetector;
         _versionDeleter = versionDeleter;
-        _isRateLimitedDecorated = isRateLimitedDecorated;
     }
-
-    /// <summary>
-    /// Whether the injected deleter's pipeline reports rate-limit outcomes. Composition (ticket 008) sets it
-    /// to <see langword="true"/> for the in-box backends, which detect 429 themselves; a future rate-limit
-    /// decorator that swallows or delays those signals flips the flag there instead of in this service.
-    /// </summary>
-    /// <remarks>
-    /// The fail-fast rule still stops the run on a <see cref="PackageVersionStatus.RateLimited"/> outcome
-    /// when the flag is <see langword="false"/>, because an unexpected rate-limit signal is safer to stop on
-    /// than to ignore.
-    /// </remarks>
-    public bool IsRateLimitedDecorated => _isRateLimitedDecorated;
 
     /// <summary>
     /// Asynchronously delists all prerelease versions of a NuGet package to be delisted based on the provided API credentials and package ID.

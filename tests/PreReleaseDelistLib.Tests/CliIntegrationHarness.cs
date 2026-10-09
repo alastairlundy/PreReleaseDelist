@@ -126,14 +126,12 @@ internal static class CliIntegrationHarness
                 new PackageDelistService(
                     serviceProvider.GetRequiredService<IPackageVersionService>(),
                     serviceProvider.GetRequiredService<IPackageAvailabilityDetector>(),
-                    serviceProvider.GetRequiredKeyedService<IPackageVersionDeleter>("http"),
-                    isRateLimitedDecorated: true))
+                    serviceProvider.GetRequiredKeyedService<IPackageVersionDeleter>("http")))
             .AddKeyedSingleton<IPackageDelistService>("sdk", static (serviceProvider, _) =>
                 new NetSdkPackageDelistService(
                     serviceProvider.GetRequiredService<IPackageVersionService>(),
                     serviceProvider.GetRequiredService<IPackageAvailabilityDetector>(),
-                    serviceProvider.GetRequiredKeyedService<IPackageVersionDeleter>("sdk"),
-                    isRateLimitedDecorated: true))
+                    serviceProvider.GetRequiredKeyedService<IPackageVersionDeleter>("sdk")))
             .AddCliInvoke(ServiceLifetime.Singleton);
 
         ConfigurationBuilder configurationBuilder = new();

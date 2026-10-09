@@ -32,9 +32,9 @@ jobs:
           dotnet-version: 10.0.x
 
       # Gate: tests must pass before anything is restored for packing, built,
-      # packed or pushed. This run restores and builds Release itself; until
-      # ticket 013 lands the dedicated test project it exercises the fuzz
-      # suite. Per DECISIONS-prerelease-delist-1.0-readiness.md#T008/#T011.
+      # packed or pushed. This run restores and builds Release itself, which
+      # exercises both the fuzz suite and the dedicated unit/integration test
+      # project (Tests).
       - name: Test
         run: dotnet test "src/PreRelease DeList.slnx" -c Release
 
@@ -60,10 +60,10 @@ jobs:
       - name: Push to NuGet.org with trusted publishing
         run: dotnet nuget push "src/PreReleaseDelistCli/bin/Release/*.nupkg" --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
-  # Test gate for the RID asset channel (TK012). The publish job above keeps
-  # ticket 001's inline test step for the NuGet channel; this job exists so the
-  # six RID builds also start from a passing tree without running the suite six
-  # more times in parallel. Per DECISIONS-prerelease-delist-1.0-readiness.md#T008.
+  # Test gate for the RID asset channel. The publish job above keeps the
+  # inline test step for the NuGet channel; this job exists against its own
+  # gate so the six RID builds also start from a passing tree without running
+  # the suite six more times in parallel.
   test:
     name: Test gate (RID asset channel)
     runs-on: ubuntu-latest
@@ -100,8 +100,8 @@ jobs:
       # full picture of which platforms built.
       fail-fast: false
       matrix:
-        # Exactly the six RIDs of DECISIONS-prerelease-delist-1.0-readiness.md#T019
-        # (Option A minus both musl RIDs) — musl/Alpine users are served by the
+        # The six RID list mirrors the README Channel 2 (Option A minus both
+        # musl RIDs) — musl/Alpine users are served by the
         # dotnet tool channel, noted in the README. Adding a RID later is one
         # line here, not a decision reversal.
         rid:

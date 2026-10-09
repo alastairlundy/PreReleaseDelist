@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+using System.Text.RegularExpressions;
 using CliInvoke.Core;
 
 namespace PreReleaseDelistLib;
@@ -118,16 +119,27 @@ public sealed class SdkPackageVersionDeleter : IPackageVersionDeleter
 
             return new PackageVersionOutcome(packageId, version, PackageVersionStatus.Failed);
         }
-        catch
+        catch (Exception exception) when (exception is not OperationCanceledException
+            || !cancellationToken.IsCancellationRequested)
         {
+            // A cancellation of the caller's token is deliberately not converted: it escapes so the
+            // composing service and the command boundary can report the run as interrupted instead
+            // of as a wall of Failed outcomes.
             return new PackageVersionOutcome(packageId, version, PackageVersionStatus.Failed);
         }
     }
 
     private static bool LooksRateLimited(string output)
     {
-        return output.Contains("429", StringComparison.OrdinalIgnoreCase)
-            || output.Contains("too many requests", StringComparison.OrdinalIgnoreCase)
+        // "429" must stand alone: an unexpected error that merely echoes a version number such as
+        // "2.429.0" must not be misreported as a rate limit. Dots are excluded so version numerals
+        // and decimal times never match.
+        if (Regex.IsMatch(output, "(?<![0-9.])429(?![0-9.])"))
+        {
+            return true;
+        }
+
+        return output.Contains("too many requests", StringComparison.OrdinalIgnoreCase)
             || output.Contains("rate limit", StringComparison.OrdinalIgnoreCase)
             || output.Contains("rate-limit", StringComparison.OrdinalIgnoreCase)
             || output.Contains("ratelimit", StringComparison.OrdinalIgnoreCase)
