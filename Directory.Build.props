@@ -3,7 +3,6 @@
     Shared build policy for every project in the repository (src/ and tests/).
     Project files carry only project-specific settings; anything that applies
     repo-wide belongs here.
-    Per docs/decisions/DECISIONS-prerelease-delist-1.0-readiness.md#T011.
   -->
   <PropertyGroup>
     <LangVersion>14</LangVersion>

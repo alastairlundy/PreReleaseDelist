@@ -337,8 +337,7 @@ public class CliIntegrationExitCodeTests
             new PackageDelistService(
                 new InterruptedVersionService(),
                 provider.GetRequiredService<IPackageAvailabilityDetector>(),
-                new ScriptedDeleter(),
-                isRateLimitedDecorated: true));
+                new ScriptedDeleter()));
 
         await using ServiceProvider provider = services.BuildServiceProvider();
 

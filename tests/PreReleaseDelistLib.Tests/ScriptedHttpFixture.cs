@@ -87,11 +87,13 @@ internal sealed class LoopbackServiceIndexServer : IDisposable
 {
     private readonly HttpListener _listener;
     private readonly CancellationTokenSource _stopping = new();
+    private readonly bool _includePublishEntry;
     private Task _serveLoop = Task.CompletedTask;
 
-    private LoopbackServiceIndexServer(HttpListener listener, int port)
+    private LoopbackServiceIndexServer(HttpListener listener, int port, bool includePublishEntry)
     {
         _listener = listener;
+        _includePublishEntry = includePublishEntry;
         ServiceIndexUrl = $"http://127.0.0.1:{port}/index.json";
         PublishUrl = $"http://127.0.0.1:{port}/publish/";
     }
@@ -102,7 +104,11 @@ internal sealed class LoopbackServiceIndexServer : IDisposable
     /// <summary>The publish base URL advertised inside the served service index.</summary>
     public string PublishUrl { get; }
 
-    public static LoopbackServiceIndexServer Start()
+    /// <summary>
+    /// Starts the server. With <see paramref="includePublishEntry"/> false the served index
+    /// advertises no <c>PackagePublish/2.0.0</c> entry, forcing the backend's fallback route.
+    /// </summary>
+    public static LoopbackServiceIndexServer Start(bool includePublishEntry = true)
     {
         for (int attempt = 1; ; attempt++)
         {
@@ -121,7 +127,7 @@ internal sealed class LoopbackServiceIndexServer : IDisposable
                 continue;
             }
 
-            LoopbackServiceIndexServer server = new(listener, port);
+            LoopbackServiceIndexServer server = new(listener, port, includePublishEntry);
             server._serveLoop = Task.Run(server.ServeAsync);
             return server;
         }
@@ -166,8 +172,9 @@ internal sealed class LoopbackServiceIndexServer : IDisposable
 
     private async Task ServeAsync()
     {
-        string body =
-            $"{{\"version\":\"3.0.0\",\"resources\":[{{\"@id\":\"{PublishUrl}\",\"@type\":\"PackagePublish/2.0.0\"}}]}}";
+        string body = _includePublishEntry
+            ? $"{{\"version\":\"3.0.0\",\"resources\":[{{\"@id\":\"{PublishUrl}\",\"@type\":\"PackagePublish/2.0.0\"}}]}}"
+            : "{\"version\":\"3.0.0\",\"resources\":[]}";
         byte[] payload = Encoding.UTF8.GetBytes(body);
 
         while (!_stopping.IsCancellationRequested)
