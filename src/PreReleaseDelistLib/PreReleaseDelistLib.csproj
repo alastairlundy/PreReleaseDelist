@@ -17,6 +17,7 @@
 
     <ItemGroup>
       <InternalsVisibleTo Include="PreReleaseDelistLib.FuzzTests" />
+      <InternalsVisibleTo Include="PreReleaseDelistLib.Tests" />
     </ItemGroup>
 
     <ItemGroup>

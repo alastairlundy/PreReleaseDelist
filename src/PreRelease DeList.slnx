@@ -2,4 +2,5 @@
   <Project Path="PreReleaseDelistCli/PreReleaseDelistCli.csproj" />
   <Project Path="PreReleaseDelistLib/PreReleaseDelistLib.csproj" />
   <Project Path="../tests/PreReleaseDelistLib.FuzzTests/PreReleaseDelistLib.FuzzTests.csproj" />
+  <Project Path="../tests/PreReleaseDelistLib.Tests/PreReleaseDelistLib.Tests.csproj" />
 </Solution>
