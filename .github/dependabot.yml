@@ -32,3 +32,20 @@ updates:
       day: monday
     cooldown:
       default-days: 14
+    groups:
+      nuget-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+  # GitHub Actions workflows live in .github/workflows/, which Dependabot finds
+  # via the repository root (directory: "/"). Kept on the same weekly schedule
+  # and cooldown as NuGet so workflow dependency bumps arrive grouped too.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 14
