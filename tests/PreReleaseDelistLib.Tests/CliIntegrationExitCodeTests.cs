@@ -283,6 +283,28 @@ public class CliIntegrationExitCodeTests
         await Assert.That(server.Requests).IsEmpty();
     }
 
+    [Test]
+    public async Task UnknownOption_ReportsItOnStderr_AndExitsTwoWithoutTouchingTheServer()
+    {
+        using MockNuGetV3Server server = MockNuGetV3Server.Start();
+        string packageId = NewPackageId("ExitUnknownOption");
+
+        // The parser has no error for an unknown option: it hands the token to the versions
+        // position, so the command itself has to recognise it. A valid version sits next to it to
+        // prove the rejection wins over a run that would otherwise have proceeded.
+        CommandRun run = await CliIntegrationHarness.RunAsync(
+            "--package-id", packageId,
+            "--server-url", server.ServiceIndexUrl,
+            "--api-key", CliIntegrationHarness.TestApiKey,
+            "--typo-dry-run",
+            "1.0.0");
+
+        await Assert.That(run.ExitCode).IsEqualTo(DelistCommand.ExitUsage);
+        await Assert.That(run.StdErr).Contains("--typo-dry-run");
+        await Assert.That(run.StdOut).IsEmpty();
+        await Assert.That(server.Requests).IsEmpty();
+    }
+
     private static string NewPackageId(string scenario)
         => $"{scenario}.{Guid.NewGuid():N}";
 

@@ -63,7 +63,7 @@ dotnet build -c Release
 
 | Name                    | Type            | Required                            | Default                               | Description                                                                                                                                                              |
 |-------------------------|-----------------|-------------------------------------|---------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `versions` (argument)   | string[]        | Yes (unless `--delist-all` is used) | —                                     | One or more pre-release version strings to delist. Only version strings starting with a digit are considered; others are ignored.                                        |
+| `versions` (argument)   | string[]        | Yes (unless `--delist-all` is used) | —                                     | One or more pre-release version strings to delist, passed positionally — there is no `--versions` option. Only version strings starting with a digit are considered; others are ignored, except a token starting with `-`, which is rejected as an unknown option (see [Exit codes](#exit-codes)). |
 | `--package-id`          | string          | Yes                                 | —                                     | The ID of the package to delist, e.g. `MyPackage`.                                                                                                                       |
 | `--api-key`             | string          | Yes*                                | —                                     | The NuGet API key to authenticate with. If omitted, the CLI falls back to the `PRERELEASEDELIST_NuGetApiKey` or `NUGET_API_KEY` environment variables.                     |
 | `--server-url`          | string          | No                                  | `https://api.nuget.org/v3/index.json` | The NuGet server's V3 service index URL. Useful for third-party NuGet servers. Falls back to the `PRERELEASEDELIST_NuGetServerUrl` or `NUGET_SERVER_URL` environment variables. |
@@ -114,7 +114,7 @@ Exit is bucket-aware: `0` only when every requested version exists on the server
 A dry run does not require an API key: delete requests are the only credential-bearing path, and a dry run sends none. With `--output json`, each plan line is a JSON object using the same closed status vocabulary — a `would-delist` version renders as `not-attempted`, because the delete attempt is never made.
 
 ```bash
-prerelease-delist --package-id "MyPackage" --versions "1.0.0-alpha.1" "1.0.0-alpha.2" --dry-run
+prerelease-delist --package-id "MyPackage" --dry-run "1.0.0-alpha.1" "1.0.0-alpha.2"
 ```
 
 ```
@@ -145,12 +145,12 @@ The CLI exits only with these codes:
 |-------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | `0`   | Success — every requested version was delisted or was already delisted.                                                                     |
 | `1`   | At least one version failed, including a version the server does not have (`not-on-server`); also command-line errors the argument parser rejects (see below). |
-| `2`   | Validation failure detected by the CLI itself — an empty `--package-id`, an invalid `--backend` or `--output` value, no version strings without `--delist-all`, a missing API key on a real run, a package that does not exist on the server, or an invalid version string under strict parsing. |
+| `2`   | Validation failure detected by the CLI itself — an unknown option, an empty `--package-id`, an invalid `--backend` or `--output` value, no version strings without `--delist-all`, a missing API key on a real run, a package that does not exist on the server, or an invalid version string under strict parsing. |
 | `3`   | The server rate-limited the run; the run stopped fail-fast and reported the results so far.                                                 |
 | `4`   | The run was cancelled; the remaining versions were not attempted.                                                                          |
 | `130` | Interrupted with Ctrl-C.                                                                                                                   |
 
-Command lines that the argument parser rejects outright — a missing required option such as `--package-id`, or an option missing its value — never reach that validation: the parser writes its message to stderr and the process exits `1` without contacting the server.
+Command lines that the argument parser rejects outright — a missing required option such as `--package-id`, or an option missing its value — never reach that validation: the parser writes its message to stderr and the process exits `1` without contacting the server. An unknown option is a different case: the parser hands it to the `versions` position, where the CLI detects it, writes `Error: Unrecognized option: '--typo'.` to stderr and exits `2` — a typo'd option is never silently dropped as a non-version string.
 
 When a run produces more than one of these codes, the most severe wins: `3` beats `4`, which beats `1`, which beats `0`. `--dry-run` reuses `0`, `1`, and `2` only.
 
@@ -190,7 +190,7 @@ The `--api-key` lookup order is therefore: `--api-key` option → `PRERELEASEDEL
 Delist specific pre-release versions of a package:
 
 ```bash
-prerelease-delist --package-id "MyPackage" --versions "1.0.0-alpha.1" "1.0.0-alpha.2" --api-key "myApiKey"
+prerelease-delist --package-id "MyPackage" --api-key "myApiKey" "1.0.0-alpha.1" "1.0.0-alpha.2"
 ```
 
 Delist all pre-release versions of a package:
@@ -208,31 +208,31 @@ prerelease-delist --package-id "MyPackage" --delist-all true --include-zero-majo
 Delist from a third-party NuGet server:
 
 ```bash
-prerelease-delist --package-id "MyPackage" --versions "2.0.0-beta.4" --api-key "myApiKey" --server-url "https://my-server/api/v3/index.json"
+prerelease-delist --package-id "MyPackage" --api-key "myApiKey" --server-url "https://my-server/api/v3/index.json" "2.0.0-beta.4"
 ```
 
 Use the .NET SDK backend instead of the HTTP API:
 
 ```bash
-prerelease-delist --package-id "MyPackage" --versions "1.2.0-pre.1" --api-key "myApiKey" --backend sdk
+prerelease-delist --package-id "MyPackage" --api-key "myApiKey" --backend sdk "1.2.0-pre.1"
 ```
 
 Run non-interactively (e.g. in CI), turning on lenient version parsing:
 
 ```bash
-prerelease-delist --package-id "MyPackage" --versions "0.9.0-beta" "1.0.0-alpha" --api-key "myApiKey" --non-interactive true --use-strict-parsing false
+prerelease-delist --package-id "MyPackage" --api-key "myApiKey" --non-interactive true --use-strict-parsing false "0.9.0-beta" "1.0.0-alpha"
 ```
 
 Preview what a delist would do — no API key, no delete request:
 
 ```bash
-prerelease-delist --package-id "MyPackage" --versions "1.0.0-alpha.1" "1.0.0-alpha.2" --dry-run
+prerelease-delist --package-id "MyPackage" --dry-run "1.0.0-alpha.1" "1.0.0-alpha.2"
 ```
 
 Emit newline-delimited JSON on stdout for machine consumption:
 
 ```bash
-prerelease-delist --package-id "MyPackage" --versions "1.0.0-alpha.1" --api-key "myApiKey" --output json
+prerelease-delist --package-id "MyPackage" --api-key "myApiKey" --output json "1.0.0-alpha.1"
 ```
 
 ## Rate Limits

@@ -137,6 +137,25 @@ public class DelistCommand
 
     public async Task<int> RunAsync()
     {
+        // The argument tokenizer turns an unknown option such as --typo into a plain argument token
+        // (only a missing required option or a missing option value reaches it as an error), and the
+        // greedy versions position absorbs it — where the digit filter in ResolveOptions would drop
+        // it silently. Reject option-looking tokens here so a typo fails the run as the usage error
+        // it is, instead of vanishing (T005).
+        string[] unknownOptions = (Versions ?? [])
+            .Where(static version => version.StartsWith('-'))
+            .ToArray();
+
+        if (unknownOptions.Length > 0)
+        {
+            foreach (string unknownOption in unknownOptions)
+            {
+                await Console.Error.WriteLineAsync($"Error: Unrecognized option: '{unknownOption}'.");
+            }
+
+            return ExitUsage;
+        }
+
         DelistOptions options = ResolveOptions();
 
         IReadOnlyList<DelistOptionsValidationFailure> failures = options.Validate();

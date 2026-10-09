@@ -16,8 +16,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `version`, and `status` in that fixed order — no envelope, no array wrapper, no extra fields —
   with stderr left human-readable.
 - A documented exit-code contract: `0` success, `1` any per-version failure including
-  not-on-server, `2` usage or validation, `3` rate-limited, `4` cancelled, `130` Ctrl-C. Dry-run
-  reuses `0`/`1`/`2`; the four previous `return -1` exits are gone.
+  not-on-server — and command lines the argument parser rejects outright, such as a missing required
+  option or an option missing its value — `2` a validation failure the CLI detects itself (an unknown
+  option, an empty package id, an invalid `--backend`/`--output` value, no version strings, a missing
+  API key on a real run, a package not on the server, or an invalid version string under strict
+  parsing), `3` rate-limited, `4` cancelled, `130` Ctrl-C. Dry-run reuses `0`/`1`/`2`; the four
+  previous `return -1` exits are gone.
 - `DelistOptions`: precedence resolution (`--option` → `PRERELEASEDELIST_*` → `NUGET_*` → default)
   and mode-aware validation (dry-run skips the API-key requirement) extracted from the command into
   a pure, testable type.
@@ -73,6 +77,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   backends were affected.
 - `--include-zero-major` is now honoured when passed to `CheckPackageVersionsListedAsync`, which
   previously ignored it and always searched including pre-releases.
+- Unknown options are rejected instead of silently ignored. An unrecognized `--flag` reaches the
+  `versions` position, where the digit filter used to drop it without a word — so a typo such as
+  `--dry-runn` fell through to the real run it was meant to prevent. The CLI now writes
+  `Error: Unrecognized option: '--flag'.` to stderr and exits `2`. The README examples that spelled
+  version passing as `--versions` (which only worked because that token was ignored) now show
+  versions as positional arguments.
 
 ## 0.1.0 - 2026-09-18
 
